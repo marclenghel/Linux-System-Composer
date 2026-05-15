@@ -11,7 +11,7 @@ A compatibility-aware platform for visually designing, validating, generating, a
 - [Main goals](#main-goals)
    - [1. Visual Linux System Composition](#1-visual-linux-system-composition)
    - [2. Compatibility Intelligence](#2-compatibility-intelligence)
-   - [3. Reproducibility](#3-reproductibility)
+   - [3. Reproducibility](#3-reproducibility)
    - [4. Safety](#4-safety)
 - [Project Philosophy](#project-philosophy)
 - [Inspiration](#inspiration)
