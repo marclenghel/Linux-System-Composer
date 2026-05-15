@@ -16,8 +16,8 @@ A compatibility-aware platform for visually designing, validating, generating, a
 - [Project Philosophy](#project-philosophy)
 - [Inspiration](#inspiration)
 - [Long-Term Vision](#long-term-vision)
-- [Current Development Direction](#curent-development-direction)
-- [Architecture](#arhitecture)
+- [Current Development Direction](#current-development-direction)
+- [Architecture](#architecture)
    - [Frontend](#frontend)
    - [Backend](#backend)
    - [Data Layer](#data-layer)
@@ -28,7 +28,7 @@ A compatibility-aware platform for visually designing, validating, generating, a
    - [Safety Layer](#safety-layer)
 - [Initial Scope](#initial-scope)
 - [MVP Features](#mvp-features)
-   - [Planned MVP](#planed-mvp)
+   - [Planned MVP](#planned-mvp)
       - [Stack Selection](#stack-selection)
       - [Compatibility Validation](#compatibility-validation)
       - [Presets](#presets)
@@ -148,7 +148,6 @@ Users should be able to:
 
 through an interactive interface.
 
----
 
 ## 2. Compatibility Intelligence
 
@@ -175,7 +174,6 @@ Hyprland + NVIDIA requires:
 - compatible XWayland patches
 ```
 
----
 
 ## 3. Reproducibility
 
@@ -190,7 +188,6 @@ Possible outputs:
 - dotfiles
 - boot profiles
 
----
 
 ## 4. Safety
 
@@ -305,7 +302,6 @@ Goals:
 - lightweight runtime
 - cross-platform development
 
----
 
 ## Backend
 
@@ -321,7 +317,6 @@ Reasons:
 - concurrency
 - Linux ecosystem integration
 
----
 
 ## Data Layer
 
@@ -343,7 +338,6 @@ Used for:
 
 # Core Systems
 
----
 
 ## Compatibility Engine
 
@@ -369,7 +363,6 @@ Example:
 }
 ```
 
----
 
 ## Hardware Detection Layer
 
@@ -387,7 +380,6 @@ Used for:
 - optimization suggestions
 - driver recommendations
 
----
 
 ## Configuration Generator
 
@@ -400,7 +392,6 @@ Generates:
 - dotfiles
 - deployment recipes
 
----
 
 ## Safety Layer
 
@@ -448,7 +439,6 @@ Supporting every distro immediately would massively increase complexity.
 - filesystem
 - GPU stack
 
----
 
 ### Compatibility Validation
 
@@ -456,7 +446,6 @@ Supporting every distro immediately would massively increase complexity.
 - conflict warnings
 - recommendation engine
 
----
 
 ### Presets
 
@@ -467,7 +456,6 @@ Examples:
 - Minimal
 - Security Hardened
 
----
 
 ### Config Generation
 
@@ -477,7 +465,6 @@ Generate:
 - package lists
 - config manifests
 
----
 
 # Challenges
 
@@ -497,7 +484,6 @@ The hardest problem is not installation.
 The hardest problem is:
 
 > encoding Linux compatibility knowledge into a maintainable system.
-> 
 
 ---
 
