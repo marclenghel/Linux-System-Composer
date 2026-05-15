@@ -1,6 +1,47 @@
 # Linux-System-Composer
 A compatibility-aware platform for visually designing, validating, generating, and deploying custom Linux systems.
 
+---
+
+# Table of contents
+
+- [Overview](#overview)
+- [Vision](#vision)
+- [The core ideas](#the-core-idea)
+- [Main goals](#main-goals)
+   - [1. Visual Linux System Composition](#1-visual-linux-system-composition)
+   - [2. Compatibility Intelligence](#2-compatibility-intelligence)
+   - [3. Reproducibility](#3-reproductibility)
+   - [4. Safety](#4-safety)
+- [Project Philosophy](#project-philosophy)
+- [Inspiration](#inspiration)
+- [Long-Term Vision](#long-term-vision)
+- [Current Development Direction](#curent-development-direction)
+- [Architecture](#arhitecture)
+   - [Frontend](#frontend)
+   - [Backend](#backend)
+   - [Data Layer](#data-layer)
+- [Core Systems](#core-systems)
+   - [Compatibility Engine](#compatibility-engine)
+   - [Hardware Detection Layer](#hardware-detection-layer)
+   - [Configuration Generator](#configuration-generator)
+   - [Safety Layer](#safety-layer)
+- [Initial Scope](#initial-scope)
+- [MVP Features](#mvp-features)
+   - [Planned MVP](#planed-mvp)
+      - [Stack Selection](#stack-selection)
+      - [Compatibility Validation](#compatibility-validation)
+      - [Presets](#presets)
+      - [Config Generation](#config-generation)
+- [Challenges](#challenges)
+- [Why This Project Exists](#why-this-project-exists)
+- [Status](#status)
+- [Contributing](#contributing)
+- [Future Possibilities](#future-possibilities)
+- [Final Goal](#final-goal)
+
+---
+
 # Overview
 
 Linux System Composer is an attempt to rethink how Linux systems are built.
