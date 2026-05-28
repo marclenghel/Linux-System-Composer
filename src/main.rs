@@ -525,9 +525,11 @@ fn main() {
     // Only show the chip line on Mac — it's redundant on other platforms
     if is_mac() {
         println!("Chip:       {}", detect_mac_chip());
+    } else if is_windows() {
+        println!("CPU:        {}", report.cpu);
+    } else if is_linux() {
+        println!("CPU:        {}", report.cpu);
     }
-
-    println!("CPU:        {}", report.cpu);
     println!("RAM:        {:.2} GB", report.total_ram_gb);
     // {:.2} means format as decimal with 2 digits after the point: 15.87
 
