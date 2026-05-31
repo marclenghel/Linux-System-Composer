@@ -1,7 +1,16 @@
 [package]
-name = "Hardware_Detection"
+name = "hardware-detect"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-sysinfo = "0.39.2"
+# sysinfo — cross-platform CPU, RAM, Disk detection
+# works on Linux/macOS/Windows, wraps /proc, sysctl, WMI internally
+sysinfo = "0.30"
+
+# serde — Rust's standard serialization framework
+# features = ["derive"] enables the #[derive(Serialize)] macro on our structs
+serde = { version = "1.0", features = ["derive"] }
+
+# serde_json — converts serde-enabled structs to/from JSON
+serde_json = "1.0"
