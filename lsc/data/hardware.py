@@ -1,35 +1,36 @@
-"""A stand-in hardware profile.
+"""Hardware profiles: the real reading, and the fixture that stands in for it.
 
-IMPORTANT: nothing here touches the real machine. This is sample data shaped
-*exactly* like the JSON the Rust prototype produced, so that porting the real
-detector is a drop-in replacement rather than a rewrite of every screen that
-displays hardware.
+The detector lives in lsc/detect/ and is the Python port of the Rust
+prototype. This module is the seam the screens talk to, so nothing in the
+interface needs to know whether it is looking at a real machine or a fixture —
+only at the `source` field, which says which.
 
-The port plan, roughly:
-
-    legacy/rust-hardware-detect/src/main.rs   ->   lsc/detect/
-        uname -r, /proc/cpuinfo, /proc/meminfo      -> platform/linux.py
-        system_profiler, sysctl, kextstat           -> platform/macos.py
-        WMI via PowerShell                          -> platform/windows.py
-
-Once that exists, `load_profile()` below stops returning SAMPLE_PROFILE and
-starts returning a real reading, and no screen has to change.
+The sample profile is kept for three reasons: the interface has something to
+draw in the fraction of a second before the scan finishes, the tests do not
+need a particular machine to run on, and a demo can be given from a laptop
+that is not the one being described.
 """
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
-# Where the current profile came from. The UI shows this prominently so nobody
-# mistakes sample data for a real reading during a demo.
-SOURCE_SAMPLE = "sample"
-SOURCE_DETECTED = "detected"
+from lsc.detect import SOURCE_DETECTED, SOURCE_SAMPLE, detect
+
+__all__ = [
+    "SOURCE_DETECTED",
+    "SOURCE_SAMPLE",
+    "detect_profile",
+    "sample_profile",
+    "suggestions_for",
+]
 
 
-# The field names match the Rust HardwareReport struct one for one:
-#   os, kernel, cpu{brand,cores,arch}, ram{total_gb}, motherboard,
-#   disks[{name,size_gb,disk_type}], gpus[{vendor,name}],
-#   drivers[{name,status}], network_cards[{name,mac_address}]
+# Field for field, this is the Rust HardwareReport struct: os, kernel,
+# cpu{brand,cores,arch}, ram{total_gb}, motherboard, disks[], gpus[],
+# drivers[], network_cards[]. Keeping the shapes identical is what made the
+# port a drop-in rather than a rewrite of every screen.
 SAMPLE_PROFILE: dict[str, Any] = {
     "source": SOURCE_SAMPLE,
     "os": "Arch Linux",
@@ -66,26 +67,30 @@ SAMPLE_PROFILE: dict[str, Any] = {
 }
 
 
-def load_profile() -> dict[str, Any]:
-    """Return the hardware profile the UI should display.
+def sample_profile() -> dict[str, Any]:
+    """The fixture. A deep copy, so a screen cannot edit the constant."""
+    return copy.deepcopy(SAMPLE_PROFILE)
 
-    Returns sample data today. When the detector is ported this becomes a real
-    reading with `source` set to SOURCE_DETECTED, and every screen that already
-    reads this dict keeps working unchanged.
+
+def detect_profile() -> dict[str, Any]:
+    """Read the real machine.
+
+    Takes a few seconds on Windows, so callers should run it off the UI
+    thread. Never raises — see lsc/detect/__init__.py.
     """
-    return SAMPLE_PROFILE
+    return detect()
 
 
 def suggestions_for(profile: dict[str, Any]) -> list[tuple[str, str, str]]:
     """Turn a hardware profile into catalogue suggestions.
 
-    Returns (category_id, component_id, reason) triples. This is the seam where
-    detection meets composition — the moment the detector is real, these become
-    genuine recommendations instead of an illustration of the idea.
+    Returns (category_id, component_id, reason) triples — the seam where
+    detection meets composition.
 
-    Kept deliberately crude: matching on vendor strings is not a compatibility
-    engine, and pretending otherwise would be the wrong foundation to build a
-    year of work on.
+    Still crude on purpose. Matching vendor strings is not a compatibility
+    engine, and now that the readings are real it matters more, not less, that
+    this is not mistaken for one. Milestone 3 replaces it with rules that can
+    say *why* under what conditions.
     """
     suggestions: list[tuple[str, str, str]] = []
     vendors = {gpu.get("vendor", "").upper() for gpu in profile.get("gpus", [])}
@@ -108,6 +113,15 @@ def suggestions_for(profile: dict[str, Any]) -> list[tuple[str, str, str]]:
                 "stack handles with no driver installation at all.",
             )
         )
+    elif "VIRTUAL" in vendors:
+        suggestions.append(
+            (
+                "gpu",
+                "vm-guest",
+                "This looks like a virtual machine, so the paravirtualised guest "
+                "drivers are the right choice.",
+            )
+        )
 
     loaded = {driver.get("name", "") for driver in profile.get("drivers", [])}
     if "btrfs" in loaded:
@@ -128,6 +142,17 @@ def suggestions_for(profile: dict[str, Any]) -> list[tuple[str, str, str]]:
                 "xfce",
                 f"Only {ram_gb:.0f} GB of RAM was reported — a lighter desktop will "
                 "leave more of it for your actual work.",
+            )
+        )
+
+    arch = profile.get("cpu", {}).get("arch", "")
+    if arch == "aarch64":
+        suggestions.append(
+            (
+                "kernel",
+                "linux",
+                "This is an ARM machine. The tuned x86 kernels do not apply, so "
+                "mainline is the choice that exists.",
             )
         )
 

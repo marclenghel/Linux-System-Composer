@@ -1,18 +1,24 @@
 """The hardware screen — what we are building on.
 
-Everything displayed here comes from data/hardware.py, which currently returns
-sample data. The banner at the top says so in as many words: a demo that lets
-people mistake a fixture for a real reading is not a demo, it is a lie with a
-progress bar.
+The screen draws the sample profile immediately, then scans the real machine
+in a background thread and swaps the result in when it arrives. Detection
+takes a few seconds on Windows, and an interface that freezes for three
+seconds on startup reads as broken even when it is working.
+
+The banner always says which of the two you are looking at. That mattered when
+the numbers were a fixture, and it matters more now that they are real: at a
+glance you should never be unsure whether the RTX 3060 on screen is in this
+machine or in an example.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
-from textual.widgets import DataTable, Static
+from textual.widgets import Button, DataTable, Static
 
 from lsc import content
 from lsc.data import hardware
@@ -21,17 +27,27 @@ from lsc.widgets.panel import panel
 
 
 class HardwareScreen(VerticalScroll):
-    """Read-only view of the current hardware profile."""
+    """Live view of the machine, with the sample profile as a placeholder."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.profile: dict[str, Any] = hardware.sample_profile()
+        self.scanning = False
+
+    # ── layout ────────────────────────────────────────────────────────────────
+    #
+    # Built once and updated in place. Rebuilding the widget tree on every scan
+    # would lose scroll position and table state for no benefit.
 
     def compose(self) -> ComposeResult:
-        profile = hardware.load_profile()
+        yield Static("", id="hw-banner", classes="banner")
 
-        if profile.get("source") == hardware.SOURCE_SAMPLE:
-            yield Static(f"⚠  {content.HARDWARE_SAMPLE_BANNER}", classes="banner banner-warn")
+        with Horizontal(classes="preset-bar"):
+            yield Button("Scan this machine", id="hw-scan", variant="primary")
+            yield Static("", id="hw-scan-note", classes="preset-label wide")
 
         yield Static(content.HARDWARE_INTRO, classes="intro")
-
-        yield panel("System", _system_body(profile))
+        yield panel("System", "", classes="panel")
 
         with Horizontal(classes="two-up"):
             yield _table("disks", "Storage", ("Device", "Size", "Type"))
@@ -39,26 +55,108 @@ class HardwareScreen(VerticalScroll):
 
         with Horizontal(classes="two-up"):
             yield _table("network", "Network", ("Interface", "MAC address"))
-            yield panel("Loaded modules", _drivers_body(profile))
+            yield panel("Loaded modules", "", classes="panel")
 
-        yield panel("What this implies for the build", _suggestions_body(profile))
+        yield panel("What this implies for the build", "", classes="panel")
 
     def on_mount(self) -> None:
-        profile = hardware.load_profile()
+        # Draw the fixture straight away so the screen is never empty, then go
+        # and read the real thing.
+        self._apply(self.profile)
+        self.scan()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "hw-scan":
+            self.scan()
+
+    # ── scanning ──────────────────────────────────────────────────────────────
+
+    @work(thread=True, exclusive=True)
+    def scan(self) -> None:
+        """Read the machine on a worker thread.
+
+        exclusive=True means pressing the button twice cancels the first scan
+        rather than running two at once.
+        """
+        self.app.call_from_thread(self._set_scanning, True)
+        profile = hardware.detect_profile()
+        self.app.call_from_thread(self._set_scanning, False)
+        self.app.call_from_thread(self._apply, profile)
+
+    def _set_scanning(self, scanning: bool) -> None:
+        self.scanning = scanning
+        button = self.query_one("#hw-scan", Button)
+        button.disabled = scanning
+        button.label = "Scanning…" if scanning else "Scan this machine"
+        self.query_one("#hw-scan-note", Static).update(
+            "[$text-muted]Reading CPU, memory, disks, graphics, drivers "
+            "and network…[/]"
+            if scanning
+            else ""
+        )
+
+    # ── rendering ─────────────────────────────────────────────────────────────
+
+    def _apply(self, profile: dict[str, Any]) -> None:
+        """Put a profile on screen. Called for the fixture and for real scans."""
+        self.profile = profile
+
+        self._apply_banner(profile)
+        self._panel("System").update(_system_body(profile))
+        self._panel("Loaded modules").update(_drivers_body(profile))
+        self._panel("What this implies for the build").update(
+            _suggestions_body(profile)
+        )
 
         disks = self.query_one("#disks", DataTable)
+        disks.clear()
         for disk in profile.get("disks", []):
-            disks.add_row(
-                disk["name"], f"{disk['size_gb']:,.1f} GB", disk["disk_type"]
-            )
+            disks.add_row(disk["name"], f"{disk['size_gb']:,.1f} GB", disk["disk_type"])
 
         gpus = self.query_one("#gpus", DataTable)
+        gpus.clear()
         for gpu in profile.get("gpus", []):
             gpus.add_row(gpu["vendor"], gpu["name"])
 
         network = self.query_one("#network", DataTable)
+        network.clear()
         for card in profile.get("network_cards", []):
             network.add_row(card["name"], card["mac_address"])
+
+    def _apply_banner(self, profile: dict[str, Any]) -> None:
+        banner = self.query_one("#hw-banner", Static)
+
+        if profile.get("source") == hardware.SOURCE_SAMPLE:
+            banner.set_classes("banner banner-warn")
+            banner.update(f"⚠  {content.HARDWARE_SAMPLE_BANNER}")
+            return
+
+        # A real reading that partly failed is still a real reading; say what
+        # went wrong rather than quietly showing "Unknown" everywhere.
+        if profile.get("error"):
+            banner.set_classes("banner banner-warn")
+            banner.update(
+                f"⚠  {content.HARDWARE_PARTIAL_BANNER}\n   {profile['error']}"
+            )
+            return
+
+        banner.set_classes("banner banner-ok")
+        banner.update(
+            f"✓  {content.HARDWARE_DETECTED_BANNER} "
+            f"[$text-muted]at {profile.get('detected_at', '—')}[/]"
+        )
+
+    def _panel(self, title: str) -> Static:
+        """Find one of the titled panels by its border title.
+
+        The panels have no ids because their titles are already unique, and a
+        second identifier that has to be kept in step with the first is a bug
+        waiting to happen.
+        """
+        for widget in self.query(Static):
+            if getattr(widget, "border_title", None) == title:
+                return widget
+        raise LookupError(f"no panel titled {title!r}")
 
 
 # ── building blocks ───────────────────────────────────────────────────────────
@@ -79,7 +177,7 @@ def _system_body(profile: dict[str, Any]) -> str:
     rows = (
         ("Operating system", profile.get("os", "unknown")),
         ("Kernel", profile.get("kernel", "unknown")),
-        ("Processor", f"{cpu.get('brand', 'unknown')}"),
+        ("Processor", cpu.get("brand", "unknown")),
         ("Cores / arch", f"{cpu.get('cores', '?')} logical · {cpu.get('arch', '?')}"),
         ("Memory", f"{ram.get('total_gb', 0):.1f} GB"),
         ("Motherboard", profile.get("motherboard", "unknown")),
@@ -103,9 +201,9 @@ def _drivers_body(profile: dict[str, Any]) -> str:
 def _suggestions_body(profile: dict[str, Any]) -> str:
     """Show the detection-to-composition seam.
 
-    These are produced by a crude vendor-string match, not by a compatibility
-    engine, and the closing line says so rather than letting the neat formatting
-    imply more intelligence than there is.
+    Produced by a crude vendor-string match, not by a compatibility engine.
+    The closing line says so rather than letting neat formatting imply more
+    intelligence than there is.
     """
     suggestions = hardware.suggestions_for(profile)
     if not suggestions:

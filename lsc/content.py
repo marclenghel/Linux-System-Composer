@@ -51,22 +51,25 @@ STATUS_DONE = (
     "down.",
     "The stack diagram, which redraws as you change the build.",
     "Preset builds, and the export preview that turns a build into file contents.",
+    "Real hardware detection on Linux, macOS and Windows — the Rust prototype "
+    "ported to Python, running in a background thread so nothing freezes.",
 )
 
 STATUS_NOT_DONE = (
-    "Hardware detection. The screen shows sample data shaped exactly like the "
-    "Rust prototype's JSON output, so porting the detector changes no screens.",
     "The compatibility engine. Validate runs a deliberately simple check over "
     "the requires/conflicts fields — enough to prove the screen works, nowhere "
     "near the rule engine described in the README.",
+    "Detection feeding composition properly. The suggestions on the Hardware "
+    "screen match vendor strings; they do not reason about what the hardware "
+    "can actually run.",
     "Writing anything to disk. Export shows you the files; it does not save "
     "them, and it certainly does not install anything.",
 )
 
 ROADMAP = (
     ("1", "Interface and catalogue", "done", "Screens, navigation, 40 components with their relationships."),
-    ("2", "Hardware detection", "next", "Port the Rust detector to Python; drop it in behind load_profile()."),
-    ("3", "Compatibility engine", "planned", "Real rule evaluation: resolution, explanation, suggested fixes."),
+    ("2", "Hardware detection", "done", "Linux via /proc and /sys, macOS via system_profiler, Windows via one CIM query."),
+    ("3", "Compatibility engine", "next", "Real rule evaluation: resolution, explanation, suggested fixes."),
     ("4", "Config generation", "planned", "Write package manifests, install scripts, and bootloader entries."),
     ("5", "Safety layer", "planned", "Dry runs, snapshots, rollback, and a boot fallback that works."),
 )
@@ -74,8 +77,15 @@ ROADMAP = (
 # ── Hardware screen ───────────────────────────────────────────────────────────
 
 HARDWARE_SAMPLE_BANNER = (
-    "Sample data — detection is not ported yet. These fields match the Rust "
-    "prototype's JSON exactly, so the real detector drops straight in."
+    "Sample data — this is the placeholder shown while the real scan runs. "
+    "Press Scan this machine if it does not replace itself."
+)
+
+HARDWARE_DETECTED_BANNER = "Detected on this machine"
+
+HARDWARE_PARTIAL_BANNER = (
+    "Detection finished but something went wrong on the way. The fields it "
+    "did read are shown; the rest say Unknown."
 )
 
 HARDWARE_INTRO = (
@@ -119,4 +129,4 @@ EXPORT_FILES = (
 
 # ── Footer / misc ─────────────────────────────────────────────────────────────
 
-FOOTER_NOTE = "Milestone 1 — interface and catalogue"
+FOOTER_NOTE = "Milestone 2 — hardware detection"

@@ -203,3 +203,17 @@ TabPane {
     border-title-color: $text-accent;
     border-title-style: bold;
 }
+
+/* ── hardware scan states ────────────────────────────────────────────────── */
+
+.banner-ok {
+    background: $success 12%;
+    color: $text-success;
+    border-left: thick $success;
+}
+
+/* The note beside the Scan button needs room for a sentence, unlike the
+ * narrow "Start from:" label it shares a class with. */
+.preset-label.wide {
+    width: 1fr;
+}

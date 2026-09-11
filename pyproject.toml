@@ -17,7 +17,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["lsc", "lsc.data", "lsc.screens", "lsc.widgets"]
+packages = ["lsc", "lsc.data", "lsc.detect", "lsc.screens", "lsc.widgets"]
 
 # The stylesheet is not a .py file, so it has to be listed or it will be missing
 # from an installed copy and the app will fail to start.

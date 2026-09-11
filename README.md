@@ -37,7 +37,10 @@ A compatibility-aware platform for visually designing, validating, generating, a
 - [Why This Project Exists](#why-this-project-exists)
 - [Status](#status)
    - [Milestones](#milestones)
+   - [On the detector](#on-the-detector)
 - [Running it](#running-it)
+   - [Tests](#tests)
+   - [Hardware, without the interface](#hardware-without-the-interface)
    - [Layout](#layout)
 - [Contributing](#contributing)
 - [Future Possibilities](#future-possibilities)
@@ -508,7 +511,7 @@ without removing the power and flexibility that make Linux valuable.
 
 # Status
 
-**Milestone 1 of 5 — the interface and the catalogue.**
+**Milestone 2 of 5 — hardware detection.**
 
 What works today:
 
@@ -517,15 +520,17 @@ What works today:
   dependencies, conflicts, and recommended pairings written down
 - four preset builds, and an export preview that turns a build into file
   contents
+- **real hardware detection** on Linux, macOS and Windows, running in a
+  background thread so the interface never freezes while it reads
 
 What does not work yet, and is not pretended to:
 
-- **hardware detection** — the Hardware screen shows sample data, labelled as
-  such on screen. The fields match the Rust prototype's JSON exactly so the
-  ported detector drops in behind one function.
 - **the compatibility engine** — Validate runs a forty-line walk over the
   `requires` / `conflicts` fields. It is enough to prove the screen works and
   nothing like the engine described above.
+- **detection feeding composition properly** — the suggestions on the Hardware
+  screen match vendor strings. They do not reason about what the hardware can
+  actually run.
 - **writing files** — Export shows you what would be generated. It writes
   nothing and installs nothing.
 
@@ -534,31 +539,67 @@ What does not work yet, and is not pretended to:
 | # | Milestone | State |
 |---|-----------|-------|
 | 1 | Interface and catalogue | done |
-| 2 | Hardware detection — port the Rust detector to Python | next |
-| 3 | Compatibility engine — real rule evaluation | planned |
+| 2 | Hardware detection — the Rust detector ported to Python | done |
+| 3 | Compatibility engine — real rule evaluation | next |
 | 4 | Config generation — actually write the files | planned |
 | 5 | Safety layer — dry runs, snapshots, rollback | planned |
+
+## On the detector
+
+Ported from `legacy/rust-hardware-detect/`, with three deliberate changes.
+
+**It does not install anything.** The prototype ran `sudo pacman -S pciutils`
+when `lspci` was missing. Reading `/sys/bus/pci/devices/` gives the vendor of
+every display controller with no external command and no root, so the
+dependency was never needed. A tool asked to *look at* a machine must not
+install packages as a side effect — least of all a project whose README
+promises a safety layer.
+
+**Windows takes one query instead of five.** The prototype started PowerShell
+separately for the kernel, the board, the GPUs, the drivers and the network,
+and each start costs the better part of a second. One script returning JSON
+turns several seconds into roughly one.
+
+**It cannot fail.** Every field falls back to `Unknown` rather than raising, so
+a machine with no `ip`, no `lspci`, or a restricted `/proc` still reports its
+CPU and memory. A partial reading is useful; an exception is not.
 
 ---
 
 # Running it
 
-Requires Python 3.11 or newer.
+Requires Python 3.11 or newer. The launcher creates the virtual environment
+and installs dependencies the first time you run it, and works from any
+directory.
+
+**Linux / macOS**
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m lsc
+./run.sh
+```
+
+**Windows** — from PowerShell, or by double-clicking `run.cmd`:
+
+```powershell
+.\run.ps1
 ```
 
 Best in a terminal at least 120 columns wide. Press `1`–`5` to move between
 screens, `t` to switch to a light theme for a projector, and `q` to quit.
 
-Run the catalogue integrity checks with:
+## Tests
 
 ```bash
-python -m unittest discover -s tests
+./run.sh --test          # Windows: .\run.ps1 -Test
+```
+
+## Hardware, without the interface
+
+Prints the detected machine as JSON — the same reading the Hardware screen
+shows, and the closest equivalent to what the Rust prototype produced:
+
+```bash
+./run.sh --report        # Windows: .\run.ps1 -Report
 ```
 
 ## Layout
@@ -570,15 +611,20 @@ lsc/
   content.py        every piece of interface copy, in one file
   checks.py         the placeholder compatibility check (milestone 3 replaces it)
   export.py         a build rendered as packages.txt / install.sh / system.toml
+  detect/           hardware detection, ported from the Rust prototype
+    linux.py          /proc, /sys, and the PCI bus
+    macos.py          sysctl, system_profiler, kextstat
+    windows.py        one CIM query, parsed from JSON
   data/
     catalog.py      the 40 components and their relationships
     presets.py      Gaming, Developer, Minimal, Security Hardened
-    hardware.py     the stand-in hardware profile and the detection seam
+    hardware.py     the sample profile, and the seam detection plugs into
   screens/          one module per screen
   widgets/          the stack diagram and small shared pieces
   styles/app.tcss   all colours, as theme variables
 legacy/
-  rust-hardware-detect/   the original Rust prototype, kept for the port
+  rust-hardware-detect/   the original Rust prototype, kept for reference
+run.sh / run.ps1 / run.cmd   launchers that also do first-run setup
 ```
 
 ---
