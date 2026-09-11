@@ -1,0 +1,14 @@
+# This project is developed on Windows and runs on Linux, so line endings have
+# to be pinned. A shell script checked out with CRLF fails with the confusing
+# "bad interpreter: /usr/bin/env bash^M", which is exactly the kind of thing
+# that eats an afternoon.
+
+# Everything is LF in the repository and LF on checkout.
+* text=auto eol=lf
+
+# Except the two Windows script types that genuinely want CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# run.sh must stay executable and LF wherever it is checked out.
+run.sh text eol=lf
