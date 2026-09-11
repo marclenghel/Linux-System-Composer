@@ -1,1 +1,20 @@
-/target
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Rust (legacy prototype)
+/legacy/rust-hardware-detect/target
+
+# Generated output
+hardware_report.json
+/out/
+
+# OS junk
+.DS_Store
+Thumbs.db

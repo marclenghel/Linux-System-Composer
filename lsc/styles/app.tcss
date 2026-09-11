@@ -1,0 +1,205 @@
+/* Linux System Composer — stylesheet.
+ *
+ * Colours are never written literally here: every one is a theme variable, so
+ * switching themes (press t) restyles the whole application without touching
+ * this file.
+ */
+
+Screen {
+    background: $background;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+TabPane {
+    padding: 1 2 0 2;
+}
+
+/* ── shared pieces ───────────────────────────────────────────────────────── */
+
+.panel {
+    border: round $primary 40%;
+    border-title-color: $text-accent;
+    border-title-style: bold;
+    padding: 1 2;
+    margin-bottom: 1;
+    height: auto;
+}
+
+.banner {
+    padding: 0 2;
+    margin-bottom: 1;
+    height: auto;
+}
+
+.banner-warn {
+    background: $warning 12%;
+    color: $text-warning;
+    border-left: thick $warning;
+}
+
+.intro {
+    color: $text-muted;
+    padding: 0 2;
+    margin-bottom: 1;
+    height: auto;
+}
+
+.hint {
+    color: $text-muted;
+    padding: 0 2;
+    height: auto;
+}
+
+.two-up {
+    height: auto;
+}
+
+/* Children stay auto-height. Making them 100% of an auto-height row collapses
+ * both to nothing, so a side-by-side pair is allowed to end unevenly. */
+.two-up > * {
+    width: 1fr;
+    margin-right: 1;
+}
+
+.two-up > *:last-of-type {
+    margin-right: 0;
+}
+
+/* ── bullets with a hanging indent ───────────────────────────────────────── */
+
+.bullet-row {
+    height: auto;
+}
+
+.bullet-marker {
+    width: 4;
+    padding-left: 1;
+}
+
+.bullet-text {
+    width: 1fr;
+}
+
+.bullet-heading {
+    height: auto;
+    padding-left: 1;
+}
+
+.bullet-heading.spaced {
+    margin-top: 1;
+}
+
+/* ── overview ────────────────────────────────────────────────────────────── */
+
+.hero {
+    height: auto;
+    padding: 0 2 1 2;
+}
+
+/* ── compose ─────────────────────────────────────────────────────────────── */
+
+.preset-bar {
+    height: 3;
+    align-vertical: middle;
+    margin-bottom: 1;
+}
+
+.preset-label {
+    width: 14;
+    padding: 1 0 0 2;
+}
+
+.preset-button {
+    margin-right: 1;
+    min-width: 12;
+}
+
+.compose-body {
+    height: 1fr;
+}
+
+/* 28 is not arbitrary: the longest component name is 21 characters, plus a
+ * two-space indent, two border columns and two of padding. Any narrower and
+ * names like "Virtual machine guest" wrap. */
+.col-categories {
+    width: 28;
+    margin-right: 1;
+}
+
+.col-components {
+    width: 1fr;
+    min-width: 32;
+    margin-right: 1;
+}
+
+.col-detail {
+    width: 48;
+}
+
+.question {
+    height: auto;
+    padding: 0 1 1 1;
+}
+
+#categories, #components {
+    height: 1fr;
+    padding: 0 1;
+}
+
+#detail {
+    height: auto;
+}
+
+/* ── validate ────────────────────────────────────────────────────────────── */
+
+.verdict {
+    padding: 0 2 1 2;
+    height: auto;
+}
+
+#issues {
+    height: 1fr;
+}
+
+.issue.error {
+    border: round $error 60%;
+    border-title-color: $text-error;
+}
+
+.issue.warning {
+    border: round $warning 60%;
+    border-title-color: $text-warning;
+}
+
+.issue.info {
+    border: round $accent 40%;
+    border-title-color: $text-accent;
+}
+
+.ok {
+    border: round $success 60%;
+    border-title-color: $text-success;
+}
+
+/* ── export ──────────────────────────────────────────────────────────────── */
+
+.file-bar {
+    height: 3;
+    align-vertical: middle;
+    margin-bottom: 1;
+}
+
+.file-button {
+    margin-right: 1;
+    min-width: 16;
+}
+
+#preview {
+    height: 1fr;
+    border: round $primary 40%;
+    border-title-color: $text-accent;
+    border-title-style: bold;
+}

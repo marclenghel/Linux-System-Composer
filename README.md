@@ -18,8 +18,8 @@ A compatibility-aware platform for visually designing, validating, generating, a
 - [Long-Term Vision](#long-term-vision)
 - [Current Development Direction](#current-development-direction)
 - [Architecture](#architecture)
-   - [Frontend](#frontend)
-   - [Backend](#backend)
+   - [Interface](#interface)
+   - [Core](#core)
    - [Data Layer](#data-layer)
 - [Core Systems](#core-systems)
    - [Compatibility Engine](#compatibility-engine)
@@ -36,6 +36,9 @@ A compatibility-aware platform for visually designing, validating, generating, a
 - [Challenges](#challenges)
 - [Why This Project Exists](#why-this-project-exists)
 - [Status](#status)
+   - [Milestones](#milestones)
+- [Running it](#running-it)
+   - [Layout](#layout)
 - [Contributing](#contributing)
 - [Future Possibilities](#future-possibilities)
 - [Final Goal](#final-goal)
@@ -286,37 +289,30 @@ before attempting:
 
 # Architecture
 
-## Frontend
+The project was prototyped in Rust and is now being rebuilt in Python. The old
+prototype is kept under `legacy/rust-hardware-detect/` — its platform-specific
+detection commands are still the reference for the port.
 
-Recommended stack:
+## Interface
 
-- React
-- TypeScript
-- TailwindCSS
-- Tauri
-
-Goals:
-
-- fast UI
-- native desktop feel
-- lightweight runtime
-- cross-platform development
-
-
-## Backend
-
-Recommended:
-
-- Rust
+- Python 3.11+
+- [Textual](https://textual.textualize.io/) — a terminal user interface framework
 
 Reasons:
 
-- system-level programming
-- memory safety
-- performance
-- concurrency
-- Linux ecosystem integration
+- one language for the whole project instead of two
+- no system dependencies, no build step, no packaging toolchain
+- runs anywhere Linux runs, including over SSH on a machine with no desktop
+- a terminal tool for building Linux systems is in the right register
 
+## Core
+
+- Python, standard library only
+
+The interface is deliberately thin. Everything that matters — the component
+catalogue, the compatibility rules, the configuration generator — is plain data
+and plain functions with no knowledge of the terminal, so the same core could
+later be driven by a web or desktop front end without being rewritten.
 
 ## Data Layer
 
@@ -512,16 +508,78 @@ without removing the power and flexibility that make Linux valuable.
 
 # Status
 
-Early research and architecture phase.
+**Milestone 1 of 5 — the interface and the catalogue.**
 
-Nothing is implemented yet.
+What works today:
 
-Current priorities:
+- the full interface: five screens, keyboard navigation, live stack diagram
+- the component catalogue: 40 components across 9 categories, with their
+  dependencies, conflicts, and recommended pairings written down
+- four preset builds, and an export preview that turns a build into file
+  contents
 
-- defining architecture
-- designing compatibility schemas
-- planning MVP scope
-- researching Linux system interactions
+What does not work yet, and is not pretended to:
+
+- **hardware detection** — the Hardware screen shows sample data, labelled as
+  such on screen. The fields match the Rust prototype's JSON exactly so the
+  ported detector drops in behind one function.
+- **the compatibility engine** — Validate runs a forty-line walk over the
+  `requires` / `conflicts` fields. It is enough to prove the screen works and
+  nothing like the engine described above.
+- **writing files** — Export shows you what would be generated. It writes
+  nothing and installs nothing.
+
+## Milestones
+
+| # | Milestone | State |
+|---|-----------|-------|
+| 1 | Interface and catalogue | done |
+| 2 | Hardware detection — port the Rust detector to Python | next |
+| 3 | Compatibility engine — real rule evaluation | planned |
+| 4 | Config generation — actually write the files | planned |
+| 5 | Safety layer — dry runs, snapshots, rollback | planned |
+
+---
+
+# Running it
+
+Requires Python 3.11 or newer.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m lsc
+```
+
+Best in a terminal at least 120 columns wide. Press `1`–`5` to move between
+screens, `t` to switch to a light theme for a projector, and `q` to quit.
+
+Run the catalogue integrity checks with:
+
+```bash
+python -m unittest discover -s tests
+```
+
+## Layout
+
+```
+lsc/
+  app.py            the shell: theme, tabs, key bindings, the single Build
+  models.py         Component, Category, Build, Issue — plain dataclasses
+  content.py        every piece of interface copy, in one file
+  checks.py         the placeholder compatibility check (milestone 3 replaces it)
+  export.py         a build rendered as packages.txt / install.sh / system.toml
+  data/
+    catalog.py      the 40 components and their relationships
+    presets.py      Gaming, Developer, Minimal, Security Hardened
+    hardware.py     the stand-in hardware profile and the detection seam
+  screens/          one module per screen
+  widgets/          the stack diagram and small shared pieces
+  styles/app.tcss   all colours, as theme variables
+legacy/
+  rust-hardware-detect/   the original Rust prototype, kept for the port
+```
 
 ---
 
@@ -537,7 +595,7 @@ Contributions are welcome in areas such as:
 - security
 - hardware compatibility
 - UI/UX design
-- Rust development
+- Python development
 - documentation
 
 ---

@@ -1,0 +1,2 @@
+# Runtime dependency. Textual brings Rich with it.
+textual>=8.0
