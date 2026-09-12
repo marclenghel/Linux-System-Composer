@@ -799,6 +799,9 @@ shows, and the closest equivalent to what the Rust prototype produced:
 
 ## Layout
 
+A file-by-file reference, with the reasoning behind each one, is in
+[docs/files.md](docs/files.md). The short version:
+
 ```
 lsc/
   app.py              the shell: theme, tabs, key bindings, the single Build
@@ -835,6 +838,7 @@ lsc/
   styles/app.tcss     all colours, as theme variables
 docs/
   rules.md            how to write a compatibility rule
+  files.md            every file in the project, and why it exists
 tests/
   fixtures.py         fixture machines and builds, shared by the rule tests
   test_architecture.py  the boundaries, enforced instead of remembered
