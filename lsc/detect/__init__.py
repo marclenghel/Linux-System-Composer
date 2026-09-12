@@ -27,6 +27,10 @@ from typing import Any
 SOURCE_SAMPLE = "sample"
 SOURCE_DETECTED = "detected"
 
+# sys.platform spells things its own way; the report says which of the three
+# detection back ends produced it.
+PLATFORMS = {"win32": "windows", "darwin": "macos", "linux": "linux"}
+
 
 def detect() -> dict[str, Any]:
     """Read this machine and return a hardware report.
@@ -54,6 +58,11 @@ def detect() -> dict[str, Any]:
     # Architecture comes from the interpreter on every platform: it is the one
     # field that needs no system call at all.
     report["cpu"]["arch"] = normalise_arch(platform.machine())
+    # Which operating system did the reading. A compatibility rule about a
+    # running Linux kernel has no business firing when the number it is looking
+    # at is a Windows build number, and "6.12.8-arch1-1" and "10.0.26200" are
+    # both just strings by the time they reach the engine.
+    report["platform"] = PLATFORMS.get(sys.platform, sys.platform)
     report["source"] = SOURCE_DETECTED
     report["detected_at"] = time.strftime("%H:%M:%S")
     return report
@@ -85,6 +94,7 @@ def _blank_report() -> dict[str, Any]:
     """
     return {
         "source": SOURCE_DETECTED,
+        "platform": "unknown",
         "os": "Unknown",
         "kernel": "Unknown",
         "cpu": {"brand": "Unknown", "cores": 0, "arch": "unknown"},

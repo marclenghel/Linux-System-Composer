@@ -17,6 +17,51 @@ TabPane {
     padding: 1 2 0 2;
 }
 
+/* -- the tab strip -------------------------------------------------------- */
+/*
+ * Textual's default tab strip is a row of labels with an animated bar sliding
+ * underneath. The bar's two ends are animated separately, so moving between
+ * distant tabs stretches it right across the row and then shrinks it back --
+ * a lot of motion for a state change the user already knows they made.
+ *
+ * The bar is removed and the active tab carries the state itself, which is
+ * both quieter and easier to read at a glance from the back of a room.
+ */
+
+Tabs {
+    height: 1;
+    background: $surface;
+}
+
+Underline {
+    display: none;
+}
+
+Tab {
+    padding: 0 2;
+    color: $text-muted;
+}
+
+Tab:hover {
+    color: $foreground;
+    background: $panel;
+}
+
+Tab.-active {
+    color: $background;
+    background: $primary;
+    text-style: bold;
+}
+
+/* Textual brightens the active tab again when the strip itself has keyboard
+ * focus. Without this the tab changes colour just from being tabbed into,
+ * which reads as a second kind of selection that does not exist. */
+Tabs:focus Tab.-active {
+    color: $background;
+    background: $primary;
+    text-style: bold;
+}
+
 /* ── shared pieces ───────────────────────────────────────────────────────── */
 
 .panel {
@@ -38,6 +83,14 @@ TabPane {
     background: $warning 12%;
     color: $text-warning;
     border-left: thick $warning;
+}
+
+/* Not a warning. Used where the interface is stating scope rather than
+ * apologising for a placeholder -- see content.VALIDATE_SCOPE_NOTE. */
+.banner-note {
+    background: $secondary 10%;
+    color: $text-muted;
+    border-left: thick $secondary;
 }
 
 .intro {
@@ -182,6 +235,17 @@ TabPane {
 .ok {
     border: round $success 60%;
     border-title-color: $text-success;
+}
+
+/* The checks the engine could not make. Deliberately dimmer than a real
+ * issue: it is not a problem with the build, it is a gap in what is known. */
+.unchecked {
+    border: round $secondary 40%;
+    border-title-color: $text-muted;
+    padding: 1 2;
+    margin-bottom: 1;
+    height: auto;
+    color: $text-muted;
 }
 
 /* ── export ──────────────────────────────────────────────────────────────── */

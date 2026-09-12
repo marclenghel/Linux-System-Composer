@@ -18,19 +18,38 @@ from typing import Any
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
-from lsc import content
+from lsc import checks, content
 from lsc.data import hardware
 from lsc.data.catalog import CATEGORIES_BY_ID, COMPONENTS_BY_ID
+from lsc.models import Build
 from lsc.widgets.panel import panel
 
 
 class HardwareScreen(VerticalScroll):
     """Live view of the machine, with the sample profile as a placeholder."""
 
-    def __init__(self) -> None:
+    class Scanned(Message):
+        """A reading finished. Carries it up so Validate can use it too.
+
+        The hardware is read once, here, and everything that needs it is told.
+        Two screens each running their own scan would double the cost and could
+        disagree with each other about what machine they are on.
+        """
+
+        def __init__(self, profile: dict[str, Any]) -> None:
+            self.profile = profile
+            super().__init__()
+
+    def __init__(self, build: Build) -> None:
         super().__init__()
+        # The screen needs the build because its advice is the compatibility
+        # engine's advice, and the engine reasons about a machine *and* a build
+        # together - "use the open modules" only means something relative to
+        # what is currently selected.
+        self.build = build
         self.profile: dict[str, Any] = hardware.sample_profile()
         self.scanning = False
 
@@ -69,6 +88,18 @@ class HardwareScreen(VerticalScroll):
         if event.button.id == "hw-scan":
             self.scan()
 
+    def refresh_suggestions(self) -> None:
+        """Re-run the advice against the current build.
+
+        The hardware has not changed, but what it implies has: "use the open
+        modules" stops being worth saying the moment the user selects them.
+        Called by the app when Compose reports a change, so this screen never
+        needs to know the composer exists.
+        """
+        self._panel("What this implies for the build").update(
+            _suggestions_body(self.build, self.profile)
+        )
+
     # ── scanning ──────────────────────────────────────────────────────────────
 
     @work(thread=True, exclusive=True)
@@ -82,6 +113,7 @@ class HardwareScreen(VerticalScroll):
         profile = hardware.detect_profile()
         self.app.call_from_thread(self._set_scanning, False)
         self.app.call_from_thread(self._apply, profile)
+        self.app.call_from_thread(lambda: self.post_message(self.Scanned(profile)))
 
     def _set_scanning(self, scanning: bool) -> None:
         self.scanning = scanning
@@ -105,7 +137,7 @@ class HardwareScreen(VerticalScroll):
         self._panel("System").update(_system_body(profile))
         self._panel("Loaded modules").update(_drivers_body(profile))
         self._panel("What this implies for the build").update(
-            _suggestions_body(profile)
+            _suggestions_body(self.build, profile)
         )
 
         disks = self.query_one("#disks", DataTable)
@@ -198,31 +230,40 @@ def _drivers_body(profile: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _suggestions_body(profile: dict[str, Any]) -> str:
-    """Show the detection-to-composition seam.
+def _suggestions_body(build: Build, profile: dict[str, Any]) -> str:
+    """The detection-to-composition seam.
 
-    Produced by a crude vendor-string match, not by a compatibility engine.
-    The closing line says so rather than letting neat formatting imply more
-    intelligence than there is.
+    This used to be a vendor-string match with a disclaimer printed underneath
+    saying it was not a compatibility engine. It is now the compatibility
+    engine: the same rules the Validate tab runs, narrowed to the ones that end
+    in a change this screen could actually make to the build.
     """
-    suggestions = hardware.suggestions_for(profile)
-    if not suggestions:
-        return "[$text-muted]Nothing to suggest from this profile.[/]"
+    report = checks.evaluate(build, profile)
+    actionable = [issue for issue in report.issues if issue.suggestion is not None]
+
+    if not actionable:
+        if not report.hardware_known:
+            return f"[$text-muted]{content.HARDWARE_SUGGESTIONS_NEED_SCAN}[/]"
+        return f"[$text-muted]{content.HARDWARE_SUGGESTIONS_EMPTY}[/]"
 
     lines = []
-    for category_id, component_id, reason in suggestions:
-        category = CATEGORIES_BY_ID.get(category_id)
-        component = COMPONENTS_BY_ID.get(component_id)
+    for issue in actionable:
+        category = CATEGORIES_BY_ID.get(issue.suggestion.category_id)
+        component = COMPONENTS_BY_ID.get(issue.suggestion.component_id)
         if category is None or component is None:
             continue
         lines.append(
             f"[$text-accent]→[/] [$text-muted]{category.name}:[/] [b]{component.name}[/b]\n"
-            f"   [$text-muted]{reason}[/]"
+            f"   [$text-muted]{issue.title}[/]\n"
+            f"   [$text-muted italic]rule: {issue.rule_id}[/]"
         )
 
-    lines.append("")
-    lines.append(
-        "[$text-muted italic]Matched on vendor strings alone. Milestone 3 replaces "
-        "this with real rules.[/]"
-    )
+    # Saying how many rules are still waiting on a reading is the honest
+    # counterpart to showing the ones that fired.
+    if report.unchecked and not report.hardware_known:
+        lines.append("")
+        lines.append(
+            f"[$text-muted italic]{len(report.unchecked)} further rules need a "
+            "reading of this machine before they can say anything.[/]"
+        )
     return "\n".join(lines)

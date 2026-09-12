@@ -13,8 +13,10 @@ from __future__ import annotations
 import unittest
 
 from lsc import checks, export
+from lsc.conditions import parse_version
 from lsc.data.catalog import (
     CATEGORIES,
+    CATEGORIES_BY_ID,
     CATEGORY_BY_LAYER,
     COMPONENTS_BY_ID,
     LAYERS,
@@ -106,6 +108,40 @@ class TestPresets(unittest.TestCase):
             errors = [issue.title for issue in issues if issue.severity == "error"]
             self.assertEqual(errors, [], f"preset '{preset.id}' has errors: {errors}")
 
+    def test_a_preset_broken_by_the_machine_always_says_how_to_fix_it(self) -> None:
+        """A preset *can* be wrong for a machine, and that is the point.
+
+        The Gaming preset picks the open NVIDIA modules, which is right on the
+        card most people buying a gaming machine own and an outright error on a
+        GTX 1060. Asserting that no preset ever errors on any hardware would be
+        asserting the tool has nothing useful to say.
+
+        What must hold is weaker and more useful: when hardware turns a shipped
+        preset into an error, the user did not choose any of it, so the engine
+        owes them a way out that a program could apply on their behalf.
+        """
+        from tests import fixtures
+
+        for preset in PRESETS:
+            build = Build(name=preset.id, selections=dict(preset.selections))
+            for machine, profile in fixtures.MACHINES.items():
+                report = checks.evaluate(build, profile)
+                for issue in report.issues:
+                    if issue.severity != "error":
+                        continue
+                    with self.subTest(preset=preset.id, machine=machine, issue=issue.key):
+                        self.assertIsNotNone(
+                            issue.suggestion,
+                            f"{preset.id} on {machine} errors with no applicable fix",
+                        )
+
+    def test_every_preset_is_clean_before_any_machine_is_known(self) -> None:
+        """Whatever hardware later says, a preset must be sound on its own terms."""
+        for preset in PRESETS:
+            build = Build(name=preset.id, selections=dict(preset.selections))
+            with self.subTest(preset=preset.id):
+                self.assertTrue(checks.evaluate(build).installable())
+
 
 class TestExport(unittest.TestCase):
     def test_every_export_renders_for_every_preset(self) -> None:
@@ -121,11 +157,17 @@ class TestExport(unittest.TestCase):
         self.assertIn("nvidia_drm.modeset=1", export.install_script(build))
 
 
-class TestChecks(unittest.TestCase):
+class TestCatalogueMeetsTheEngine(unittest.TestCase):
+    """The catalogue's own data, checked against what the engine expects of it.
+
+    Behaviour of the engine is tested in test_engine.py and the rule set in
+    test_rules.py. What is left here is the catalogue's side of the contract.
+    """
+
     def test_conflict_is_reported_once_not_twice(self) -> None:
         """SELinux and Arch each declare the clash; the user should see one issue."""
         build = Build(selections={**default_selections(), "security": "selinux"})
-        conflicts = [i for i in checks.check(build) if "conflicts with" in i.title]
+        conflicts = [i for i in checks.check(build) if i.key.startswith("conflict:")]
         self.assertEqual(len(conflicts), 1, [i.title for i in conflicts])
 
     def test_missing_requirement_is_an_error(self) -> None:
@@ -138,8 +180,46 @@ class TestChecks(unittest.TestCase):
         selections = default_selections()
         selections.pop("display")
         selections["desktop"] = "headless"
-        warnings = [i for i in checks.check(Build(selections=selections)) if i.severity == "warning"]
-        self.assertEqual(warnings, [])
+        unanswered = [
+            i for i in checks.check(Build(selections=selections))
+            if i.key.startswith("unanswered:")
+        ]
+        self.assertEqual(unanswered, [])
+
+    def test_every_provided_fact_is_a_dotted_key_and_a_string(self) -> None:
+        """provides is a flat namespace shared with the detector's facts.
+
+        A component quietly providing a non-string would compare strangely
+        against a hardware fact rather than failing outright, which is the
+        worst way for a rule to be wrong.
+        """
+        for component in COMPONENTS_BY_ID.values():
+            for key, value in component.provides:
+                with self.subTest(component=component.id, key=key):
+                    self.assertIn(".", key, "a fact key should be namespaced")
+                    self.assertIsInstance(value, str)
+
+    def test_no_component_provides_a_hardware_fact(self) -> None:
+        """The build must never be able to claim something about the machine."""
+        for component in COMPONENTS_BY_ID.values():
+            for key, _value in component.provides:
+                with self.subTest(component=component.id, key=key):
+                    self.assertFalse(key.startswith("hardware."))
+
+    def test_every_kernel_states_a_version_and_a_channel(self) -> None:
+        """Version rules are only as good as the floors the catalogue declares."""
+        kernel_category = CATEGORIES_BY_ID["kernel"]
+        for component in kernel_category.components:
+            provided = dict(component.provides)
+            with self.subTest(kernel=component.id):
+                self.assertIn("kernel.version", provided)
+                self.assertIn(provided.get("kernel.channel"), {"mainline", "lts"})
+
+    def test_declared_kernel_floors_parse_as_versions(self) -> None:
+        for component in CATEGORIES_BY_ID["kernel"].components:
+            version = dict(component.provides).get("kernel.version")
+            with self.subTest(kernel=component.id):
+                self.assertIsNotNone(parse_version(version), version)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from lsc import __version__
 from lsc.data.catalog import CATEGORIES, COMPONENTS_BY_ID
 from lsc.models import Build
 
@@ -138,7 +139,11 @@ def manifest(build: Build) -> str:
         "# Linux System Composer build manifest",
         f'name = "{build.name}"',
         f'generated = "{date.today().isoformat()}"',
-        'composer_version = "0.2.0"',
+        # Read from the package rather than written out, because a version
+        # string copied into a generated file is a version string that will
+        # eventually be wrong in a file someone is relying on to reproduce
+        # a system.
+        f'composer_version = "{__version__}"',
         "",
         "[stack]",
     ]

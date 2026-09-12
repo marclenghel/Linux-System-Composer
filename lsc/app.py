@@ -72,13 +72,27 @@ class ComposerApp(App[None]):
         # The single piece of mutable state in the whole application.
         self.build = Build(name="untitled-system", selections=default_selections())
 
+        # Textual draws the bar under the tab strip by animating its left and
+        # right edges as two independent tweens. Jumping from tab 1 to tab 5
+        # therefore stretches the bar across the whole row and then pulls it
+        # back in, which looks cheap and draws the eye away from the content.
+        # The bar itself is hidden in app.tcss and the active tab is styled
+        # instead; turning animation off here stops anything else in the
+        # interface sliding about for the same reason.
+        #
+        # Set on the instance rather than as a class attribute because that is
+        # where Textual reads it from - App.__init__ assigns animation_level
+        # from an environment constant, and a class attribute of the same name
+        # is simply ignored.
+        self.animation_level = "none"
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with TabbedContent(initial="tab-overview"):
             with TabPane("Overview", id="tab-overview"):
                 yield OverviewScreen()
             with TabPane("Hardware", id="tab-hardware"):
-                yield HardwareScreen()
+                yield HardwareScreen(self.build)
             with TabPane("Compose", id="tab-compose"):
                 yield ComposeScreen(self.build)
             with TabPane("Validate", id="tab-validate"):
@@ -101,7 +115,17 @@ class ComposerApp(App[None]):
         """
         self.query_one(ValidateScreen).refresh_view()
         self.query_one(ExportScreen).refresh_view()
+        self.query_one(HardwareScreen).refresh_suggestions()
         self.sub_title = f"{self.build.name} — {content.FOOTER_NOTE}"
+
+    def on_hardware_screen_scanned(self, event: HardwareScreen.Scanned) -> None:
+        """A hardware reading arrived, so the rules that need one can now run.
+
+        The machine is read once and the result handed on. Validate holds no
+        opinion about detection and never triggers a scan of its own; it simply
+        stops answering "unknown" once someone tells it what is in the box.
+        """
+        self.query_one(ValidateScreen).set_hardware(event.profile)
 
     # ── actions ───────────────────────────────────────────────────────────────
 

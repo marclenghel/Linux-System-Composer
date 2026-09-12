@@ -38,6 +38,16 @@ class Component:
     packages: tuple[str, ...] = ()                # what a generated install would pull
     maturity: str = "stable"                      # stable | modern | legacy | experimental
 
+    # Facts this component contributes to the world when it is selected, as
+    # (key, value) pairs — ("kernel.version", "6.12"), ("driver.branch", "open").
+    #
+    # requires/conflicts/recommends can only say *which* other components are
+    # involved. `provides` is how a component says something with a value in
+    # it, which is what a version constraint needs: the README's own example
+    # rule is "kernel_min": "6.6", and comparing against that means some
+    # component has to state what kernel version the build actually gets.
+    provides: tuple[tuple[str, str], ...] = ()
+
 
 @dataclass(frozen=True)
 class Category:
@@ -111,6 +121,19 @@ class Build:
 
 
 @dataclass(frozen=True)
+class Suggestion:
+    """A fix the composer could apply itself: "set this category to that".
+
+    `fix` on an Issue is a sentence for a person. This is the same advice in
+    the shape a program can act on, which is what a "apply this fix" button
+    needs in order to exist at all.
+    """
+
+    category_id: str
+    component_id: str
+
+
+@dataclass(frozen=True)
 class Issue:
     """Something the composer wants to tell the user about their build.
 
@@ -118,12 +141,23 @@ class Issue:
     *explains* incompatibilities instead of just refusing them, so an issue
     with no suggested way forward is considered a bug in the rule, not a
     valid result.
+
+    `key` is what makes two reports of the same problem the same problem. The
+    placeholder check used to collapse "A conflicts with B" and "B conflicts
+    with A" by splitting the title on the words "conflicts with"; an issue now
+    carries its own identity instead, so deduplication never depends on how a
+    sentence happens to be worded.
     """
 
     severity: str                                 # error | warning | info
     title: str
     detail: str
     fix: str
+    key: str = ""                                 # stable identity, for dedup
+    rule_id: str = ""                             # which rule produced this
+    components: tuple[str, ...] = ()              # component ids the issue is about
+    suggestion: Suggestion | None = None          # the machine-applicable fix
+    reference: str = ""                           # where to read more
 
 
 @dataclass(frozen=True)

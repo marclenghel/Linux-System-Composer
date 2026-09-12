@@ -16,9 +16,13 @@ from __future__ import annotations
 import unittest
 
 from lsc.data import hardware
+from lsc.data.catalog import default_selections
+from lsc.data.rules import RULES
 from lsc.detect import SOURCE_DETECTED, detect, normalise_arch
 from lsc.detect import linux as linux_detect
 from lsc.detect import windows as windows_detect
+from lsc.facts import HardwareFacts, build_world
+from lsc.models import Build
 
 # Captured from `powershell` on a real Windows 11 machine, trimmed to two of
 # each list. The single-GPU case below is the interesting one: PowerShell
@@ -140,33 +144,59 @@ class TestArchNormalisation(unittest.TestCase):
                 self.assertEqual(normalise_arch(machine), expected)
 
 
-class TestSuggestions(unittest.TestCase):
-    def test_nvidia_hardware_suggests_the_open_modules(self) -> None:
-        profile = {**hardware.sample_profile(), "gpus": [{"vendor": "NVIDIA", "name": "RTX 3060"}]}
-        suggested = {component for _category, component, _reason in
-                     hardware.suggestions_for(profile)}
-        self.assertIn("nvidia-open", suggested)
+class TestDetectionFeedingTheEngine(unittest.TestCase):
+    """The seam where a reading becomes advice.
 
-    def test_amd_only_hardware_suggests_mesa(self) -> None:
-        profile = {
-            **hardware.sample_profile(),
-            "gpus": [{"vendor": "AMD", "name": "Radeon 780M"}],
-            "drivers": [],
-        }
-        suggested = {component for _category, component, _reason in
-                     hardware.suggestions_for(profile)}
-        self.assertIn("mesa", suggested)
-        self.assertNotIn("nvidia-open", suggested)
+    This used to test hardware.suggestions_for, which matched vendor substrings
+    and returned tuples. That function is gone: turning "the string said NVIDIA"
+    into "use the open modules" is a compatibility judgement, and those live in
+    the rule set now. What is left to check here is that a detector report is
+    actually usable by the engine - the field names line up, and a real reading
+    turns hardware rules from undecided into decided.
+    """
 
-    def test_every_suggestion_names_a_real_component(self) -> None:
-        from lsc.data.catalog import CATEGORIES_BY_ID, COMPONENTS_BY_ID
+    def test_a_detector_report_normalises_into_hardware_facts(self) -> None:
+        report = windows_detect.parse(WINDOWS_JSON)
+        report["source"] = SOURCE_DETECTED
+        report["platform"] = "windows"
 
-        for category_id, component_id, reason in hardware.suggestions_for(
-            hardware.sample_profile()
-        ):
-            self.assertIn(category_id, CATEGORIES_BY_ID)
-            self.assertIn(component_id, COMPONENTS_BY_ID)
-            self.assertTrue(reason.strip(), "a suggestion with no reason is not a suggestion")
+        facts = HardwareFacts.from_profile(report)
+        self.assertIsNotNone(facts)
+        self.assertEqual(facts.cpu_cores, 16)
+        self.assertEqual(len(facts.gpus), 1)
+
+    def test_the_model_string_a_detector_produces_resolves_to_a_generation(self) -> None:
+        """The whole point of the port meeting the engine.
+
+        The Windows detector reports "NVIDIA GeForce RTX 3060"; the engine has
+        to get "Ampere" out of that, or no rule can reason about the card.
+        """
+        report = windows_detect.parse(WINDOWS_JSON)
+        report["source"] = SOURCE_DETECTED
+        facts = HardwareFacts.from_profile(report)
+        self.assertEqual(facts.gpus[0].architecture, "Ampere")
+        self.assertGreaterEqual(facts.best_nvidia_rank(), 60)
+
+    def test_the_sample_profile_is_not_mistaken_for_a_reading(self) -> None:
+        """Rules must not describe a machine nobody has looked at."""
+        self.assertIsNone(HardwareFacts.from_profile(hardware.sample_profile()))
+
+    def test_a_missing_profile_is_unknown_rather_than_empty(self) -> None:
+        self.assertIsNone(HardwareFacts.from_profile(None))
+
+    def test_every_detected_field_the_rules_ask_for_is_present(self) -> None:
+        """A rule naming a fact the detector never fills in can never fire."""
+        report = windows_detect.parse(WINDOWS_JSON)
+        report["source"] = SOURCE_DETECTED
+        report["platform"] = "windows"
+        world = build_world(Build(selections=default_selections()), report)
+
+        for rule in RULES:
+            for key in rule.fact_keys():
+                if not key.startswith("hardware."):
+                    continue
+                with self.subTest(rule=rule.id, fact=key):
+                    self.assertIn(key, world.facts)
 
 
 class TestLiveDetection(unittest.TestCase):
@@ -183,7 +213,7 @@ class TestLiveDetection(unittest.TestCase):
 
     def test_report_has_every_promised_field(self) -> None:
         for key in (
-            "source", "os", "kernel", "cpu", "ram", "motherboard",
+            "source", "platform", "os", "kernel", "cpu", "ram", "motherboard",
             "disks", "gpus", "drivers", "network_cards",
         ):
             self.assertIn(key, self.report)
@@ -195,9 +225,20 @@ class TestLiveDetection(unittest.TestCase):
             self.assertIsInstance(self.report[key], list)
 
     def test_marked_as_detected_not_sample(self) -> None:
-        """The interface decides which banner to show from this one field."""
+        """The interface decides which banner to show from this one field.
+
+        The engine reads it too, and refuses to reason about hardware unless it
+        says "detected" - so this field is what separates a rule describing
+        your machine from a rule describing an example.
+        """
         self.assertEqual(self.report["source"], SOURCE_DETECTED)
         self.assertIn("detected_at", self.report)
+
+    def test_a_real_reading_lets_the_engine_decide_hardware_rules(self) -> None:
+        """End to end: this machine, whatever it is, produces usable facts."""
+        facts = HardwareFacts.from_profile(self.report)
+        self.assertIsNotNone(facts)
+        self.assertIn(facts.platform, {"linux", "macos", "windows"})
 
     def test_arch_is_reported_in_linux_spelling(self) -> None:
         self.assertNotIn(self.report["cpu"]["arch"], ("AMD64", "ARM64"))

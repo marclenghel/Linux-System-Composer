@@ -1,167 +1,46 @@
-"""A deliberately naive compatibility check.
+"""The public face of the compatibility engine.
 
-This is NOT the compatibility engine from the README. It walks the
-requires/conflicts/recommends fields of the selected components and reports
-what it finds — nothing more. There is no version reasoning, no transitive
-resolution, no hardware awareness, and no notion of a rule having a condition.
+Milestone 3 replaced what used to be here. This file was a forty-line walk over
+the requires/conflicts/recommends tuples with no version reasoning, no
+conditions, no transitivity and no idea what machine it was running on; the
+engine that replaced it lives in lsc/engine.py, the language its rules are
+written in lives in lsc/conditions.py, and the rules themselves live in
+lsc/data/rules.py.
 
-It exists so the Validate screen has something true to display, and so the
-shape of an Issue is settled before the real engine is written against it.
-Everything here is expected to be thrown away in milestone 3.
+What stayed is this module's name and the shape of its functions, so no screen
+had to be edited to gain any of it. That is the payoff for having kept the core
+free of interface code: the whole heart of the project was swapped out
+underneath five screens that did not notice.
 """
 
 from __future__ import annotations
 
-from lsc.data.catalog import CATEGORIES, CATEGORIES_BY_ID, COMPONENTS_BY_ID, component_name
+from typing import Any, Mapping
+
+from lsc.data.catalog import CATEGORIES_BY_ID
+from lsc.engine import Report, evaluate
 from lsc.models import Build, Issue
 
-SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
+__all__ = [
+    "Report",
+    "build_is_installable",
+    "category_name",
+    "check",
+    "evaluate",
+    "summarise",
+]
 
 
-def check(build: Build) -> list[Issue]:
-    """Return every issue this naive pass can find, worst first."""
-    issues: list[Issue] = []
-    selected = build.selected_ids()
+def check(build: Build, hardware_profile: Mapping[str, Any] | None = None) -> list[Issue]:
+    """Every issue in this build, worst first.
 
-    for category in CATEGORIES:
-        component_id = build.selected_id(category.id)
-
-        # An unanswered question is a warning, unless the category says an empty
-        # answer is legitimate (a headless build has no display server).
-        if component_id is None:
-            if not category.optional:
-                issues.append(
-                    Issue(
-                        severity="warning",
-                        title=f"No {category.name.lower()} selected",
-                        detail=(
-                            f"{category.question} Nothing is chosen, so this layer of "
-                            "the stack is empty."
-                        ),
-                        fix=f"Open Compose and pick something under {category.name}.",
-                    )
-                )
-            continue
-
-        component = COMPONENTS_BY_ID.get(component_id)
-        if component is None:
-            continue
-
-        issues.extend(_check_requires(component, selected))
-        issues.extend(_check_conflicts(component, selected))
-        issues.extend(_check_recommends(component, selected))
-
-    # Two components can declare the same conflict about each other, which would
-    # otherwise be reported twice from opposite directions.
-    issues = _deduplicate(issues)
-    issues.sort(key=lambda issue: SEVERITY_ORDER.get(issue.severity, 9))
-    return issues
-
-
-def _check_requires(component, selected: set[str]) -> list[Issue]:
-    found = []
-    for required_id in component.requires:
-        if required_id in selected:
-            continue
-        required_category = _category_of(required_id)
-        found.append(
-            Issue(
-                severity="error",
-                title=f"{component.name} requires {component_name(required_id)}",
-                detail=(
-                    f"{component.name} does not work without "
-                    f"{component_name(required_id)}, and the current build does not "
-                    "include it."
-                ),
-                fix=(
-                    f"Select {component_name(required_id)} under "
-                    f"{required_category}, or choose a different "
-                    f"{_category_of_component(component)}."
-                ),
-            )
-        )
-    return found
-
-
-def _check_conflicts(component, selected: set[str]) -> list[Issue]:
-    found = []
-    for conflicting_id in component.conflicts:
-        if conflicting_id not in selected:
-            continue
-        found.append(
-            Issue(
-                severity="error",
-                title=(
-                    f"{component.name} conflicts with {component_name(conflicting_id)}"
-                ),
-                detail=(
-                    f"Both {component.name} and {component_name(conflicting_id)} are "
-                    "in this build, and they cannot be installed together."
-                ),
-                fix=(
-                    f"Drop one of them — replace {component.name} or replace "
-                    f"{component_name(conflicting_id)}."
-                ),
-            )
-        )
-    return found
-
-
-def _check_recommends(component, selected: set[str]) -> list[Issue]:
-    found = []
-    for recommended_id in component.recommends:
-        if recommended_id in selected:
-            continue
-        found.append(
-            Issue(
-                severity="info",
-                title=(
-                    f"{component.name} pairs well with {component_name(recommended_id)}"
-                ),
-                detail=(
-                    f"{component.name} works without it, but "
-                    f"{component_name(recommended_id)} is the combination most people "
-                    "run and most documentation assumes."
-                ),
-                fix=(
-                    f"Consider {component_name(recommended_id)} under "
-                    f"{_category_of(recommended_id)}."
-                ),
-            )
-        )
-    return found
-
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-
-def _category_of(component_id: str) -> str:
-    """Which category a component id belongs to, by display name."""
-    for category in CATEGORIES:
-        if any(c.id == component_id for c in category.components):
-            return category.name
-    return "the catalogue"
-
-
-def _category_of_component(component) -> str:
-    return _category_of(component.id).lower()
-
-
-def _deduplicate(issues: list[Issue]) -> list[Issue]:
-    """Collapse the same conflict reported from both sides.
-
-    "A conflicts with B" and "B conflicts with A" are one problem. Sorting the
-    two names gives both directions the same key.
+    The hardware profile is optional and may be omitted entirely; rules that
+    depend on the machine then evaluate to unknown rather than guessing. Use
+    evaluate() instead when you also want to know *which* checks could not be
+    made — the Validate screen does, because a check that was skipped silently
+    is indistinguishable from one that passed.
     """
-    seen: set[tuple[str, frozenset[str]]] = set()
-    unique: list[Issue] = []
-    for issue in issues:
-        key = (issue.severity, frozenset(issue.title.replace(" conflicts with ", "|").split("|")))
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(issue)
-    return unique
+    return list(evaluate(build, hardware_profile).issues)
 
 
 def summarise(issues: list[Issue]) -> dict[str, int]:

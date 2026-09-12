@@ -23,6 +23,11 @@ A compatibility-aware platform for visually designing, validating, generating, a
    - [Data Layer](#data-layer)
 - [Core Systems](#core-systems)
    - [Compatibility Engine](#compatibility-engine)
+      - [Rules are data](#rules-are-data)
+      - [Three answers, not two](#three-answers-not-two)
+      - [Following the graph](#following-the-graph)
+      - [The worked example](#the-worked-example)
+      - [Where the knowledge lives](#where-the-knowledge-lives)
    - [Hardware Detection Layer](#hardware-detection-layer)
    - [Configuration Generator](#configuration-generator)
    - [Safety Layer](#safety-layer)
@@ -319,19 +324,18 @@ later be driven by a web or desktop front end without being rewritten.
 
 ## Data Layer
 
-Possible formats:
+Today the catalogue, the rules and the presets are Python data structures —
+frozen dataclasses, no logic in them — held in `lsc/data/`.
 
-- JSON
-- TOML
-- YAML
-- SQLite
+They are written that way rather than as TOML on purpose, and the choice is
+reversible by design: every condition and every rule serialises to JSON and
+back, and a test evaluates both copies against every fixture to prove the two
+agree. Moving the rule set into a file is therefore a loader, not a rewrite.
 
-Used for:
-
-- compatibility rules
-- dependency graphs
-- system presets
-- hardware profiles
+Python first buys type checking, autocompletion, and a typo that fails a test
+instead of crashing at start-up. TOML later buys rules that can be edited and
+shared without touching the program. The intended order is to get the knowledge
+right, then move it.
 
 ---
 
@@ -340,27 +344,105 @@ Used for:
 
 ## Compatibility Engine
 
-The heart of the platform.
+The heart of the platform, and as of milestone 3 it is real. Full reference in
+[docs/rules.md](docs/rules.md).
 
 Responsible for:
 
-- dependency resolution
-- conflict detection
-- recommendation generation
-- stack validation
+- dependency resolution, following the graph rather than one hop
+- conflict detection, including conflicts nothing in the data states directly
+- version constraints
+- reasoning about the hardware actually present
+- explaining every issue, and suggesting a way forward
 
-Example:
+### Rules are data
+
+A rule is not a Python function. It is a tree of small frozen records the
+evaluator walks:
+
+```python
+Rule(
+    id="nvidia-open-needs-turing",
+    severity="error",
+    when=AllOf(
+        Selected("nvidia-open"),
+        Fact("hardware.gpu.nvidia_rank", "lt", gpus.TURING),
+    ),
+    title="{gpu.name} is too old for the open NVIDIA kernel modules",
+    detail="The open kernel modules only drive cards with the GSP "
+           "microcontroller, which arrived with Turing. This machine "
+           "reports a {gpu.name}, which is {gpu.architecture}...",
+    fix="Choose NVIDIA (proprietary) instead.",
+    suggest=Suggestion("gpu", "nvidia"),
+)
+```
+
+Why records and not lambdas: a lambda cannot be written to a TOML file. The
+data layer below is supposed to hold compatibility rules, and a rule set that
+only exists as Python has to be rewritten the day it moves out of Python. A
+tree of records survives the round trip to JSON and back — and the test suite
+serialises the whole rule set, reads it back, and checks both copies produce
+identical results, so that is a checked property rather than an intention.
+
+### Three answers, not two
+
+A condition returns true, false, or **unknown**. "Is the graphics card older
+than Turing?" has no answer until the machine has been scanned, and answering
+*false* there would quietly pass a build that is about to fail.
+
+So unknown propagates, and the Validate screen lists what it could not check
+alongside what it found. A check that was skipped silently is indistinguishable
+from one that passed.
+
+The same principle covers a graphics card the model table does not recognise:
+it gets no generation, every rule about generations goes unknown, and the
+engine says so. Refusing someone a driver because a lookup table is out of date
+would be exactly the kind of confident wrongness this project exists to avoid.
+
+### Following the graph
+
+Nothing in the catalogue says the Hardened security profile conflicts with the
+proprietary NVIDIA driver. It says Hardened needs `linux-hardened`, and
+separately that `linux-hardened` refuses to sit beside `nvidia`. An engine that
+looks one hop finds nothing wrong with that build. This one walks the requires
+edges, keeps the path, and reports:
 
 ```
-{
-  "hyprland": {
-    "requires": ["wayland"],
-    "recommended": ["pipewire"],
-    "conflicts": ["nvidia-legacy"],
-    "kernel_min":"6.6"
-  }
-}
+✕  linux-hardened conflicts with NVIDIA (proprietary)
+
+   linux-hardened and NVIDIA (proprietary) cannot be installed on the
+   same system.
+
+   linux-hardened is not something you picked directly — it is pulled
+   in by Hardened:  Hardened → linux-hardened
+
+   Fix  Drop one of them — replace linux-hardened under Kernel, or
+        NVIDIA (proprietary) under GPU Driver.
 ```
+
+### The worked example
+
+Selecting Hyprland alongside an NVIDIA driver produces the specific warning
+this README has promised since the first commit — DRM mode setting, the
+initramfs modules, explicit sync and the driver version it needs, and XWayland
+— rather than a generic "these conflict". There is a test for each of those
+four points, because a promise in a README is worth what its test is worth.
+
+### Where the knowledge lives
+
+```
+lsc/conditions.py     the language      nodes, three-valued logic, JSON round trip
+lsc/facts.py          the world         a Build + a hardware reading -> facts
+lsc/engine.py         the interpreter   graph closure, evaluation, templating
+lsc/data/rules.py     the knowledge     the rules themselves
+lsc/data/gpus.py      a lookup table    GPU model -> architecture, capability
+lsc/checks.py         the façade        what the screens call
+```
+
+Plain "X requires Y" and "X conflicts with Y" stay in the catalogue next to the
+component, and the engine turns those edges into issues itself. Only knowledge
+with a *condition* in it — "if this and that", anything with a version,
+anything about the machine — is written as a rule.
 
 
 ## Hardware Detection Layer
@@ -511,7 +593,7 @@ without removing the power and flexibility that make Linux valuable.
 
 # Status
 
-**Milestone 2 of 5 — hardware detection.**
+**Milestone 3 of 5 — the compatibility engine.**
 
 What works today:
 
@@ -522,17 +604,25 @@ What works today:
   contents
 - **real hardware detection** on Linux, macOS and Windows, running in a
   background thread so the interface never freezes while it reads
+- **the compatibility engine** — conditional rules, version constraints,
+  transitive resolution through the dependency graph, and rules that reason
+  about the card actually in the machine. Every rule is data, and every issue
+  carries an explanation and a way forward. See
+  [Compatibility Engine](#compatibility-engine) below and
+  [docs/rules.md](docs/rules.md).
+- **detection feeding composition** — the advice on the Hardware screen is now
+  the engine's advice, with the rule that produced it named underneath
 
 What does not work yet, and is not pretended to:
 
-- **the compatibility engine** — Validate runs a forty-line walk over the
-  `requires` / `conflicts` fields. It is enough to prove the screen works and
-  nothing like the engine described above.
-- **detection feeding composition properly** — the suggestions on the Hardware
-  screen match vendor strings. They do not reason about what the hardware can
-  actually run.
 - **writing files** — Export shows you what would be generated. It writes
   nothing and installs nothing.
+- **package-level resolution** — the engine reasons about components, not about
+  individual packages and their versions. That is pacman's job, and this tool
+  stops where pacman starts.
+- **a complete rule set** — the rules cover the interactions worth knowing
+  about, not the whole of Linux. Validate lists the checks it could not make
+  rather than passing over them in silence.
 
 ## Milestones
 
@@ -540,8 +630,8 @@ What does not work yet, and is not pretended to:
 |---|-----------|-------|
 | 1 | Interface and catalogue | done |
 | 2 | Hardware detection — the Rust detector ported to Python | done |
-| 3 | Compatibility engine — real rule evaluation | next |
-| 4 | Config generation — actually write the files | planned |
+| 3 | Compatibility engine — real rule evaluation | done |
+| 4 | Config generation — actually write the files | next |
 | 5 | Safety layer — dry runs, snapshots, rollback | planned |
 
 ## On the detector
@@ -593,6 +683,11 @@ screens, `t` to switch to a light theme for a projector, and `q` to quit.
 ./run.sh --test          # Windows: .\run.ps1 -Test
 ```
 
+161 tests. Most of them guard data rather than behaviour, because the data is
+where this project's value is and where a mistake is hardest to see by
+reading: relationship ids that point at nothing, presets that do not install,
+a rule that can never fire, a GPU pattern that shadows the one below it.
+
 ## Hardware, without the interface
 
 Prints the detected machine as JSON — the same reading the Hardware screen
@@ -609,7 +704,10 @@ lsc/
   app.py            the shell: theme, tabs, key bindings, the single Build
   models.py         Component, Category, Build, Issue — plain dataclasses
   content.py        every piece of interface copy, in one file
-  checks.py         the placeholder compatibility check (milestone 3 replaces it)
+  conditions.py     the rule language: condition nodes, three-valued logic
+  facts.py          a Build plus a hardware reading, as one namespace of facts
+  engine.py         the evaluator: graph closure, rule evaluation, templating
+  checks.py         the façade the screens call
   export.py         a build rendered as packages.txt / install.sh / system.toml
   detect/           hardware detection, ported from the Rust prototype
     linux.py          /proc, /sys, and the PCI bus
@@ -617,15 +715,26 @@ lsc/
     windows.py        one CIM query, parsed from JSON
   data/
     catalog.py      the 40 components and their relationships
+    rules.py        the compatibility rules, as data
+    gpus.py         GPU model strings -> architecture and capability
     presets.py      Gaming, Developer, Minimal, Security Hardened
     hardware.py     the sample profile, and the seam detection plugs into
   screens/          one module per screen
   widgets/          the stack diagram and small shared pieces
   styles/app.tcss   all colours, as theme variables
+docs/
+  rules.md          how to write a compatibility rule
+tests/
+  fixtures.py       fixture machines and builds, shared by the rule tests
 legacy/
   rust-hardware-detect/   the original Rust prototype, kept for reference
 run.sh / run.ps1 / run.cmd   launchers that also do first-run setup
 ```
+
+Nothing under `models.py`, `conditions.py`, `facts.py`, `engine.py`,
+`checks.py`, `export.py`, `data/` or `detect/` imports anything from the
+interface. The entire compatibility engine was added in milestone 3 without a
+single screen changing its imports, which is what that separation was for.
 
 ---
 

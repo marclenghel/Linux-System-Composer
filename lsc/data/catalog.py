@@ -116,6 +116,17 @@ BASE = Category(
 
 
 # ── Kernel ────────────────────────────────────────────────────────────────────
+#
+# The kernel versions below are the one piece of data in this file with a shelf
+# life, so they are stated as *floors* — "choosing this gets you at least this"
+# — rather than as the version Arch happens to ship today. A floor only ever
+# understates, so a rule built on it can warn about a kernel being too old and
+# never wrongly promise one is new enough.
+#
+# CATALOGUE_AS_OF is when they were last checked. When it drifts far from the
+# present, `pacman -Si linux linux-lts` is the whole update procedure.
+
+CATALOGUE_AS_OF = "2026-09"
 
 KERNEL = Category(
     id="kernel",
@@ -138,6 +149,7 @@ KERNEL = Category(
                 "support arrives quickly, and every wiki page assumes you are running it."
             ),
             tags=("mainline", "default"),
+            provides=(("kernel.version", "6.15"), ("kernel.channel", "mainline")),
             packages=("linux", "linux-headers"),
         ),
         Component(
@@ -151,6 +163,7 @@ KERNEL = Category(
                 "support for hardware released after the branch was cut."
             ),
             tags=("lts", "conservative"),
+            provides=(("kernel.version", "6.12"), ("kernel.channel", "lts")),
             packages=("linux-lts", "linux-lts-headers"),
         ),
         Component(
@@ -163,6 +176,7 @@ KERNEL = Category(
                 "vanilla: still mainline, still current, just tuned for a desktop."
             ),
             tags=("desktop", "low-latency"),
+            provides=(("kernel.version", "6.15"), ("kernel.channel", "mainline")),
             packages=("linux-zen", "linux-zen-headers"),
         ),
         Component(
@@ -177,6 +191,7 @@ KERNEL = Category(
             ),
             tags=("performance", "gaming", "scheduler"),
             requires=("cachyos",),
+            provides=(("kernel.version", "6.15"), ("kernel.channel", "mainline")),
             packages=("linux-cachyos", "linux-cachyos-headers"),
             maturity="modern",
         ),
@@ -192,6 +207,7 @@ KERNEL = Category(
             ),
             tags=("security", "hardened"),
             conflicts=("nvidia",),
+            provides=(("kernel.version", "6.15"), ("kernel.channel", "mainline")),
             packages=("linux-hardened", "linux-hardened-headers"),
         ),
     ),
@@ -291,6 +307,7 @@ FILESYSTEM = Category(
                 "you is snapshots, checksums, or transparent compression."
             ),
             tags=("default", "reliable"),
+            provides=(("fs.snapshots", "no"), ("fs.out_of_tree", "no")),
             packages=("e2fsprogs",),
         ),
         Component(
@@ -305,6 +322,7 @@ FILESYSTEM = Category(
                 "their directories, or they fragment badly."
             ),
             tags=("cow", "snapshots", "compression"),
+            provides=(("fs.snapshots", "yes"), ("fs.out_of_tree", "no")),
             recommends=("grub",),
             packages=("btrfs-progs", "snapper"),
         ),
@@ -318,6 +336,7 @@ FILESYSTEM = Category(
                 "shrink."
             ),
             tags=("throughput", "large-files"),
+            provides=(("fs.snapshots", "no"), ("fs.out_of_tree", "no")),
             packages=("xfsprogs",),
         ),
         Component(
@@ -332,6 +351,7 @@ FILESYSTEM = Category(
                 "occasionally have to wait before rebooting."
             ),
             tags=("integrity", "raid", "out-of-tree"),
+            provides=(("fs.snapshots", "yes"), ("fs.out_of_tree", "yes")),
             recommends=("linux-lts",),
             conflicts=("linux-hardened",),
             packages=("zfs-dkms", "zfs-utils"),
@@ -346,6 +366,7 @@ FILESYSTEM = Category(
                 "theoretical."
             ),
             tags=("flash", "mobile"),
+            provides=(("fs.snapshots", "no"), ("fs.out_of_tree", "no")),
             packages=("f2fs-tools",),
         ),
     ),
@@ -378,6 +399,7 @@ GPU = Category(
             ),
             tags=("open-source", "amd", "intel"),
             recommends=("wayland",),
+            provides=(("driver.branch", "mesa"), ("driver.out_of_tree", "no")),
             packages=("mesa", "vulkan-radeon", "vulkan-intel", "libva-mesa-driver"),
         ),
         Component(
@@ -392,6 +414,7 @@ GPU = Category(
             ),
             tags=("proprietary", "nvidia", "cuda"),
             conflicts=("nouveau", "linux-hardened"),
+            provides=(("driver.branch", "closed"), ("driver.out_of_tree", "yes")),
             packages=("nvidia-dkms", "nvidia-utils", "lib32-nvidia-utils"),
         ),
         Component(
@@ -407,6 +430,7 @@ GPU = Category(
             tags=("nvidia", "open-kernel-module", "turing+"),
             conflicts=("nouveau",),
             recommends=("wayland",),
+            provides=(("driver.branch", "open"), ("driver.out_of_tree", "yes")),
             packages=("nvidia-open-dkms", "nvidia-utils"),
             maturity="modern",
         ),
@@ -422,6 +446,7 @@ GPU = Category(
             ),
             tags=("open-source", "nvidia", "limited-performance"),
             conflicts=("nvidia", "nvidia-open"),
+            provides=(("driver.branch", "nouveau"), ("driver.out_of_tree", "no")),
             packages=("mesa", "xf86-video-nouveau"),
         ),
         Component(
@@ -435,6 +460,7 @@ GPU = Category(
                 "it on metal."
             ),
             tags=("virtual", "testing"),
+            provides=(("driver.branch", "virtual"), ("driver.out_of_tree", "no")),
             packages=("mesa", "xf86-video-vmware", "spice-vdagent"),
         ),
     ),

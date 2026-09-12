@@ -53,24 +53,30 @@ STATUS_DONE = (
     "Preset builds, and the export preview that turns a build into file contents.",
     "Real hardware detection on Linux, macOS and Windows — the Rust prototype "
     "ported to Python, running in a background thread so nothing freezes.",
+    "The compatibility engine. Conditional rules, version constraints, "
+    "transitive resolution through the dependency graph, and rules that reason "
+    "about the card actually in this machine — every one of them written as "
+    "data rather than as code.",
+    "Detection feeding composition: the Hardware screen's advice now comes from "
+    "the same rules as Validate, and says under what condition it applies.",
 )
 
 STATUS_NOT_DONE = (
-    "The compatibility engine. Validate runs a deliberately simple check over "
-    "the requires/conflicts fields — enough to prove the screen works, nowhere "
-    "near the rule engine described in the README.",
-    "Detection feeding composition properly. The suggestions on the Hardware "
-    "screen match vendor strings; they do not reason about what the hardware "
-    "can actually run.",
     "Writing anything to disk. Export shows you the files; it does not save "
     "them, and it certainly does not install anything.",
+    "Package-level resolution. The engine reasons about components, not about "
+    "individual packages and their versions — that is pacman's job, and this "
+    "tool stops where pacman starts.",
+    "A complete rule set. The rules are a curated set covering the interactions "
+    "worth knowing about, not the whole of Linux. Validate lists the checks it "
+    "could not make rather than staying quiet about them.",
 )
 
 ROADMAP = (
     ("1", "Interface and catalogue", "done", "Screens, navigation, 40 components with their relationships."),
     ("2", "Hardware detection", "done", "Linux via /proc and /sys, macOS via system_profiler, Windows via one CIM query."),
-    ("3", "Compatibility engine", "next", "Real rule evaluation: resolution, explanation, suggested fixes."),
-    ("4", "Config generation", "planned", "Write package manifests, install scripts, and bootloader entries."),
+    ("3", "Compatibility engine", "done", "Rules as data: conditions, versions, hardware, transitive resolution."),
+    ("4", "Config generation", "next", "Write package manifests, install scripts, and bootloader entries."),
     ("5", "Safety layer", "planned", "Dry runs, snapshots, rollback, and a boot fallback that works."),
 )
 
@@ -89,10 +95,20 @@ HARDWARE_PARTIAL_BANNER = (
 )
 
 HARDWARE_INTRO = (
-    "Detection feeds composition. Knowing the GPU vendor narrows the driver "
-    "choice, the CPU feature level decides whether an optimised kernel is worth "
-    "it, and the modules already loaded tell you what this machine is running "
-    "today."
+    "Detection feeds composition. The graphics model decides which NVIDIA "
+    "driver will even bind, the memory decides whether a full desktop is "
+    "sensible, and the modules already loaded tell you what this machine is "
+    "running today."
+)
+
+HARDWARE_SUGGESTIONS_EMPTY = (
+    "Nothing to suggest: every rule that depends on this machine is satisfied "
+    "by the current build."
+)
+
+HARDWARE_SUGGESTIONS_NEED_SCAN = (
+    "Nothing has read this machine yet, so the rules that depend on it cannot "
+    "say anything. Press Scan this machine."
 )
 
 # ── Compose screen ────────────────────────────────────────────────────────────
@@ -103,15 +119,32 @@ PRESETS_TITLE = "Start from a preset"
 
 # ── Validate screen ───────────────────────────────────────────────────────────
 
-VALIDATE_PLACEHOLDER_BANNER = (
-    "Placeholder check. This reads the requires/conflicts fields in the "
-    "catalogue and nothing more — no version constraints, no transitive "
-    "resolution, no hardware awareness. Milestone 3 replaces it."
+# The placeholder banner that used to live here is gone, because the thing it
+# warned about is finished. What replaces it is not a warning but a scope note:
+# still honest about the limits, no longer apologising for being a stub.
+VALIDATE_SCOPE_NOTE = (
+    "Checks dependencies through the whole graph, conflicts, version floors, "
+    "and what this machine can actually run. Rules are a curated set, not the "
+    "whole of Linux — anything it could not check is listed below rather than "
+    "passed over."
+)
+
+VALIDATE_UNCHECKED_TITLE = "Not checked"
+
+VALIDATE_UNCHECKED_INTRO = (
+    "These rules depend on knowing what is in the machine, and nothing has read "
+    "it yet. A check that was skipped silently is indistinguishable from one "
+    "that passed, so they are listed:"
+)
+
+VALIDATE_SCAN_HINT = (
+    "Open the Hardware tab and press Scan this machine to decide them."
 )
 
 VALIDATE_CLEAN = (
-    "Nothing to report. Every requirement in this build is satisfied and no two "
-    "components declare a conflict with each other."
+    "Nothing to report. Every requirement in this build is satisfied, no two "
+    "components conflict, and no rule in the set has anything to say about this "
+    "combination."
 )
 
 # ── Export screen ─────────────────────────────────────────────────────────────
@@ -129,4 +162,4 @@ EXPORT_FILES = (
 
 # ── Footer / misc ─────────────────────────────────────────────────────────────
 
-FOOTER_NOTE = "Milestone 2 — hardware detection"
+FOOTER_NOTE = "Milestone 3 — compatibility engine"
