@@ -13,7 +13,7 @@ from textual.binding import Binding
 from textual.theme import Theme
 from textual.widgets import Footer, Header, TabbedContent, TabPane
 
-from lsc import __version__, content
+from lsc import content
 from lsc.data.catalog import default_selections
 from lsc.models import Build
 from lsc.screens.compose import ComposeScreen
@@ -126,6 +126,10 @@ class ComposerApp(App[None]):
         stops answering "unknown" once someone tells it what is in the box.
         """
         self.query_one(ValidateScreen).set_hardware(event.profile)
+        # Export wants it for the same reason Validate does: the warnings it
+        # embeds in the generated install script are the engine's warnings, and
+        # half of those cannot be decided without knowing what is in the box.
+        self.query_one(ExportScreen).set_hardware(event.profile)
 
     # ── actions ───────────────────────────────────────────────────────────────
 

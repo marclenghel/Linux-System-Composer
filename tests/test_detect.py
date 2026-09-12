@@ -21,7 +21,7 @@ from lsc.data.rules import RULES
 from lsc.detect import SOURCE_DETECTED, detect, normalise_arch
 from lsc.detect import linux as linux_detect
 from lsc.detect import windows as windows_detect
-from lsc.facts import HardwareFacts, build_world
+from lsc.compat.facts import HardwareFacts, build_world
 from lsc.models import Build
 
 # Captured from `powershell` on a real Windows 11 machine, trimmed to two of

@@ -5,5 +5,5 @@ lives under legacy/rust-hardware-detect/ for reference while its detection
 logic is ported.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.5.0"
 __app_name__ = "Linux System Composer"

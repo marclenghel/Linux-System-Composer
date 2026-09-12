@@ -21,7 +21,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
-from lsc import checks, content
+from lsc import compat, content
 from lsc.data import hardware
 from lsc.data.catalog import CATEGORIES_BY_ID, COMPONENTS_BY_ID
 from lsc.models import Build
@@ -238,7 +238,7 @@ def _suggestions_body(build: Build, profile: dict[str, Any]) -> str:
     engine: the same rules the Validate tab runs, narrowed to the ones that end
     in a change this screen could actually make to the build.
     """
-    report = checks.evaluate(build, profile)
+    report = compat.evaluate(build, profile)
     actionable = [issue for issue in report.issues if issue.suggestion is not None]
 
     if not actionable:

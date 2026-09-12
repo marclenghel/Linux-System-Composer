@@ -263,12 +263,12 @@ triggered by a real build.
 ## How the pieces fit
 
 ```
-lsc/conditions.py     the language    nodes, three-valued logic, JSON round trip
-lsc/facts.py          the world       a Build + a hardware reading -> facts
-lsc/engine.py         the interpreter graph closure, rule evaluation, templating
+lsc/compat/conditions.py     the language    nodes, three-valued logic, JSON round trip
+lsc/compat/facts.py          the world       a Build + a hardware reading -> facts
+lsc/compat/engine.py         the interpreter graph closure, rule evaluation, templating
 lsc/data/rules.py     the knowledge   the rules themselves
 lsc/data/gpus.py      a lookup table  GPU model string -> architecture, capability
-lsc/checks.py         the façade      what the screens call
+lsc/compat/checks.py         the façade      what the screens call
 ```
 
 None of these imports Textual, and none of them writes to the system.

@@ -6,7 +6,7 @@ out so a test can say "on this machine, that rule fires" without anyone having
 to own the machine.
 
 Every profile is marked as a detected reading, because that is what the engine
-insists on before it will reason about hardware at all — see lsc/facts.py.
+insists on before it will reason about hardware at all — see lsc/compat/facts.py.
 """
 
 from __future__ import annotations

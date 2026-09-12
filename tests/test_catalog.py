@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import unittest
 
-from lsc import checks, export
-from lsc.conditions import parse_version
+from lsc import compat, generate
+from lsc.compat.conditions import parse_version
 from lsc.data.catalog import (
     CATEGORIES,
     CATEGORIES_BY_ID,
@@ -65,7 +65,7 @@ class TestCatalogueIntegrity(unittest.TestCase):
                     f"{category.id} defaults to unknown '{category.default}'",
                 )
 
-        issues = checks.check(Build(selections=default_selections()))
+        issues = compat.check(Build(selections=default_selections()))
         errors = [issue for issue in issues if issue.severity == "error"]
         self.assertEqual(errors, [], "the default build must be installable")
 
@@ -104,7 +104,7 @@ class TestPresets(unittest.TestCase):
     def test_presets_install(self) -> None:
         """A preset that ships with an error in it is a bug in the preset."""
         for preset in PRESETS:
-            issues = checks.check(Build(name=preset.id, selections=dict(preset.selections)))
+            issues = compat.check(Build(name=preset.id, selections=dict(preset.selections)))
             errors = [issue.title for issue in issues if issue.severity == "error"]
             self.assertEqual(errors, [], f"preset '{preset.id}' has errors: {errors}")
 
@@ -125,7 +125,7 @@ class TestPresets(unittest.TestCase):
         for preset in PRESETS:
             build = Build(name=preset.id, selections=dict(preset.selections))
             for machine, profile in fixtures.MACHINES.items():
-                report = checks.evaluate(build, profile)
+                report = compat.evaluate(build, profile)
                 for issue in report.issues:
                     if issue.severity != "error":
                         continue
@@ -140,7 +140,7 @@ class TestPresets(unittest.TestCase):
         for preset in PRESETS:
             build = Build(name=preset.id, selections=dict(preset.selections))
             with self.subTest(preset=preset.id):
-                self.assertTrue(checks.evaluate(build).installable())
+                self.assertTrue(compat.evaluate(build).installable())
 
 
 class TestExport(unittest.TestCase):
@@ -148,13 +148,13 @@ class TestExport(unittest.TestCase):
         for preset in PRESETS:
             build = Build(name=preset.id, selections=dict(preset.selections))
             for kind in ("packages", "install", "manifest"):
-                text = export.render(kind, build)
+                text = generate.render(kind, build)
                 self.assertTrue(text.strip(), f"{preset.id}/{kind} rendered empty")
 
     def test_install_script_mentions_nvidia_modeset_when_needed(self) -> None:
         """The kernel parameter is the classic silently-missed step."""
         build = Build(selections={**default_selections(), "gpu": "nvidia"})
-        self.assertIn("nvidia_drm.modeset=1", export.install_script(build))
+        self.assertIn("nvidia_drm.modeset=1", generate.install_script(build))
 
 
 class TestCatalogueMeetsTheEngine(unittest.TestCase):
@@ -167,13 +167,13 @@ class TestCatalogueMeetsTheEngine(unittest.TestCase):
     def test_conflict_is_reported_once_not_twice(self) -> None:
         """SELinux and Arch each declare the clash; the user should see one issue."""
         build = Build(selections={**default_selections(), "security": "selinux"})
-        conflicts = [i for i in checks.check(build) if i.key.startswith("conflict:")]
+        conflicts = [i for i in compat.check(build) if i.key.startswith("conflict:")]
         self.assertEqual(len(conflicts), 1, [i.title for i in conflicts])
 
     def test_missing_requirement_is_an_error(self) -> None:
         # linux-cachyos needs the CachyOS repositories; the default base is Arch.
         build = Build(selections={**default_selections(), "kernel": "linux-cachyos"})
-        self.assertFalse(checks.build_is_installable(checks.check(build)))
+        self.assertFalse(compat.build_is_installable(compat.check(build)))
 
     def test_optional_category_may_be_empty(self) -> None:
         """A headless build has no display server, and that is not a problem."""
@@ -181,7 +181,7 @@ class TestCatalogueMeetsTheEngine(unittest.TestCase):
         selections.pop("display")
         selections["desktop"] = "headless"
         unanswered = [
-            i for i in checks.check(Build(selections=selections))
+            i for i in compat.check(Build(selections=selections))
             if i.key.startswith("unanswered:")
         ]
         self.assertEqual(unanswered, [])

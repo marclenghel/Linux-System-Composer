@@ -40,5 +40,7 @@ fi
 case "${1:-}" in
     --test)   exec "$VENV_PYTHON" -m unittest discover -s tests -v ;;
     --report) exec "$VENV_PYTHON" -m lsc --report ;;
+    # --dry-run, --write, --rollback and --preset need no case of their own:
+    # the catch-all below already hands every argument to the module.
     *)        exec "$VENV_PYTHON" -m lsc "$@" ;;
 esac

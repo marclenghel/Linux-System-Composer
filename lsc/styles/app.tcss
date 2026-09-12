@@ -281,3 +281,25 @@ Tabs:focus Tab.-active {
 .preset-label.wide {
     width: 1fr;
 }
+
+
+/* ── Export: the write bar ──────────────────────────────────────────────────
+   The controls that put files on a disk. Given its own band under the preview
+   rather than sharing the file-switcher row, because pressing the wrong one of
+   those two groups has very different consequences. */
+
+.write-bar {
+    height: auto;
+    padding: 1 2 0 2;
+    align-vertical: middle;
+}
+
+.write-bar Button {
+    margin-left: 2;
+    min-width: 14;
+}
+
+.target-input {
+    width: 1fr;
+    max-width: 60;
+}

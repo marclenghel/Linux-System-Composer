@@ -1,6 +1,6 @@
 """The compatibility rules — the knowledge, separated from the machinery.
 
-Everything here is data. Nothing in this file runs; lsc/engine.py reads it.
+Everything here is data. Nothing in this file runs; lsc/compat/engine.py reads it.
 That is the point: the README's data layer holds "compatibility rules", and a
 rule set written as conditions rather than as code can be moved into a TOML
 file by writing a loader, never by rewriting the evaluator.
@@ -21,12 +21,12 @@ is that this tool explains incompatibilities rather than refusing them.
 
 Rules that need hardware evaluate to UNKNOWN until a real scan has finished,
 and the Validate screen lists them as unchecked rather than pretending they
-passed. See lsc/facts.py for why the sample profile is not good enough.
+passed. See lsc/compat/facts.py for why the sample profile is not good enough.
 """
 
 from __future__ import annotations
 
-from lsc.conditions import (
+from lsc.compat.conditions import (
     AllOf,
     AnySelected,
     CategoryEmpty,
@@ -36,7 +36,7 @@ from lsc.conditions import (
     VersionBelow,
 )
 from lsc.data import gpus
-from lsc.engine import Rule
+from lsc.compat.engine import Rule
 from lsc.models import Suggestion
 
 ARCH_WIKI = "https://wiki.archlinux.org"

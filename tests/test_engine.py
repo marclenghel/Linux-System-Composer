@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import unittest
 
-from lsc import checks
-from lsc.conditions import AllOf, Fact, Selected
-from lsc.engine import (
+from lsc import compat
+from lsc.compat.conditions import AllOf, Fact, Selected
+from lsc.compat.engine import (
     CONFLICT_PAIRS,
     Rule,
     evaluate,
@@ -145,7 +145,7 @@ class TestUnknownIsReportedNotSwallowed(unittest.TestCase):
         self.assertNotIn("nvidia-driver-without-nvidia-gpu", undecided)
 
     def test_the_sample_profile_is_refused(self) -> None:
-        """The decision from lsc/facts.py, enforced.
+        """The decision from lsc/compat/facts.py, enforced.
 
         Firing hardware rules against the fixture would put "your GeForce RTX
         4070 Ti" on screen for someone sitting at a different machine.
@@ -238,25 +238,25 @@ class TestRuleInjection(unittest.TestCase):
 
 
 class TestFacadeStillWorks(unittest.TestCase):
-    """checks.py kept its shape so no screen had to change."""
+    """compat.py kept its shape so no screen had to change."""
 
     def test_check_returns_a_list_of_issues(self) -> None:
-        issues = checks.check(fixtures.build())
+        issues = compat.check(fixtures.build())
         self.assertIsInstance(issues, list)
 
     def test_summarise_counts_by_severity(self) -> None:
-        issues = checks.check(fixtures.build(security="hardened", gpu="nvidia"))
-        counts = checks.summarise(issues)
+        issues = compat.check(fixtures.build(security="hardened", gpu="nvidia"))
+        counts = compat.summarise(issues)
         self.assertGreaterEqual(counts["error"], 1)
 
     def test_build_is_installable(self) -> None:
-        self.assertTrue(checks.build_is_installable(checks.check(fixtures.build())))
+        self.assertTrue(compat.build_is_installable(compat.check(fixtures.build())))
         self.assertFalse(
-            checks.build_is_installable(checks.check(fixtures.build(kernel="linux-cachyos")))
+            compat.build_is_installable(compat.check(fixtures.build(kernel="linux-cachyos")))
         )
 
     def test_check_works_without_being_given_any_hardware(self) -> None:
-        self.assertIsInstance(checks.check(Build(selections={})), list)
+        self.assertIsInstance(compat.check(Build(selections={})), list)
 
 
 if __name__ == "__main__":

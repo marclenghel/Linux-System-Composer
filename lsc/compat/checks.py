@@ -3,8 +3,8 @@
 Milestone 3 replaced what used to be here. This file was a forty-line walk over
 the requires/conflicts/recommends tuples with no version reasoning, no
 conditions, no transitivity and no idea what machine it was running on; the
-engine that replaced it lives in lsc/engine.py, the language its rules are
-written in lives in lsc/conditions.py, and the rules themselves live in
+engine that replaced it lives in lsc/compat/engine.py, the language its rules are
+written in lives in lsc/compat/conditions.py, and the rules themselves live in
 lsc/data/rules.py.
 
 What stayed is this module's name and the shape of its functions, so no screen
@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from lsc.data.catalog import CATEGORIES_BY_ID
-from lsc.engine import Report, evaluate
+from lsc.compat.engine import Report, evaluate
 from lsc.models import Build, Issue
 
 __all__ = [

@@ -25,8 +25,8 @@ import unittest
 
 from lsc.data.catalog import CATEGORIES, CATEGORIES_BY_ID, COMPONENTS_BY_ID
 from lsc.data.rules import RULES, RULES_BY_ID
-from lsc.engine import Rule, evaluate
-from lsc.facts import World, build_world
+from lsc.compat.engine import Rule, evaluate
+from lsc.compat.facts import World, build_world
 from lsc.models import Build
 from tests import fixtures
 

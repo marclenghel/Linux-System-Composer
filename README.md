@@ -45,6 +45,7 @@ A compatibility-aware platform for visually designing, validating, generating, a
    - [On the detector](#on-the-detector)
 - [Running it](#running-it)
    - [Tests](#tests)
+   - [Generating files, without the interface](#generating-files-without-the-interface)
    - [Hardware, without the interface](#hardware-without-the-interface)
    - [Layout](#layout)
 - [Contributing](#contributing)
@@ -431,12 +432,12 @@ four points, because a promise in a README is worth what its test is worth.
 ### Where the knowledge lives
 
 ```
-lsc/conditions.py     the language      nodes, three-valued logic, JSON round trip
-lsc/facts.py          the world         a Build + a hardware reading -> facts
-lsc/engine.py         the interpreter   graph closure, evaluation, templating
-lsc/data/rules.py     the knowledge     the rules themselves
-lsc/data/gpus.py      a lookup table    GPU model -> architecture, capability
-lsc/checks.py         the façade        what the screens call
+lsc/compat/conditions.py  the language     nodes, three-valued logic, JSON round trip
+lsc/compat/facts.py       the world        a Build + a hardware reading -> facts
+lsc/compat/engine.py      the interpreter  graph closure, evaluation, templating
+lsc/compat/checks.py      the façade       what the screens call
+lsc/data/rules.py         the knowledge    the rules themselves
+lsc/data/gpus.py          a lookup table   GPU model -> architecture, capability
 ```
 
 Plain "X requires Y" and "X conflicts with Y" stay in the catalogue next to the
@@ -464,26 +465,88 @@ Used for:
 
 ## Configuration Generator
 
-Generates:
+Milestone 4. A build becomes three files:
 
-- install scripts
-- package manifests
-- system configs
-- bootloader configs
-- dotfiles
-- deployment recipes
+| File | What it is |
+|------|------------|
+| `packages.txt` | every package the build pulls in, grouped by the decision that added it |
+| `install.sh` | the installation steps in dependency order, bottom of the stack upward |
+| `system.toml` | the build itself, as a file you can commit, share, or feed back in |
+
+Two things about them are worth more than the file formats.
+
+**The engine's findings travel with the output.** The generated `install.sh`
+carries the compatibility warnings for that exact build as comments, above the
+commands they are about. A warning that only ever appeared on a screen the user
+has since closed is a warning that did not survive to the moment it mattered —
+and the moment it matters is when somebody runs the script.
+
+**Deciding and doing are separate steps.** `plan()` reads the target directory,
+renders every file, and works out whether each would be created, replaced, or
+left alone because it is already correct — without opening anything for
+writing. `apply()` then carries out a plan it is handed. That split is what
+makes the dry run trustworthy: it is not a second implementation that might
+disagree with the real one, it is the same plan object with the last step left
+off. There is a test asserting the two agree.
+
+```
+lsc/generate/render.py   a build -> the text of the three files
+lsc/generate/plan.py     a build + a directory -> what writing would do
+lsc/generate/writer.py   carrying out a plan; the only file creator here
+```
 
 
 ## Safety Layer
 
-Handles:
+Milestone 5. There are two different things "rollback" can mean here, and this
+project does one of them and deliberately refuses the other.
 
-- backups
-- rollback
-- snapshots
-- validation
-- dry-run mode
-- boot fallback logic
+**Undoing what this tool did.** Every write leaves a `.lsc-journal.json`
+recording each file, the SHA-256 of the bytes put there, and where the previous
+contents were copied if anything was replaced. Roll back reads it and reverses
+the write — but only for files that are still byte-for-byte what was written.
+Generate a script, spend an hour editing it, press Roll back, and the hour of
+work survives and the tool says which files it left alone and why. That single
+behaviour is most of what separates a rollback you can press without thinking
+from one you have to reason about first.
+
+**Snapshotting the machine you are running on.** Not done, and not an
+oversight. Taking a filesystem snapshot needs root, and a tool whose stated
+promise is that it never touches your system does not get to make an exception
+for the feature called "safety".
+
+What `snapshots.py` does instead is work out whether the system *being
+designed* will be able to roll back, and say so while the decision is still
+reversible. Whether you can undo a bad kernel update in six months is settled
+the moment you pick a filesystem — which is exactly the kind of
+consequence-at-a-distance this project exists to surface. Choose ext4 and the
+generated script tells you, in the file, that recovery means a live USB and
+that this is why the Gaming preset picks Btrfs.
+
+Before anything is written at all, preflight has to agree:
+
+- **a build with compatibility errors is refused outright.** This is where
+  milestone 3 earns its keep. A warning nobody has to act on is one people
+  learn to scroll past; a warning that stops the export gets read. The Write
+  button is disabled, with the reason on the banner, rather than failing on
+  press.
+- **the target directory is checked** — never a system directory, never your
+  home directory itself, and the parent has to already exist so a typo cannot
+  quietly build a tree somewhere nobody will look again.
+- **nothing is overwritten without a backup**, in a directory named for the
+  moment it was taken, so a second write cannot destroy the first one's backup.
+
+And the containment rule, which is enforced by a test rather than by care:
+three modules in the whole project may touch a disk, and every path each of
+them opens goes through one guard function first.
+
+```
+lsc/safety/paths.py       where output may and may not go
+lsc/safety/preflight.py   what has to be true before anything is written
+lsc/safety/journal.py     the record of exactly what was written
+lsc/safety/rollback.py    undoing a write, without destroying later edits
+lsc/safety/snapshots.py   whether the system being designed can roll back
+```
 
 ---
 
@@ -593,7 +656,8 @@ without removing the power and flexibility that make Linux valuable.
 
 # Status
 
-**Milestone 3 of 5 — the compatibility engine.**
+**All five milestones are done.** What follows is what that actually means,
+which is less than "the project is finished" and more than a demo.
 
 What works today:
 
@@ -610,13 +674,25 @@ What works today:
   carries an explanation and a way forward. See
   [Compatibility Engine](#compatibility-engine) below and
   [docs/rules.md](docs/rules.md).
-- **detection feeding composition** — the advice on the Hardware screen is now
+- **detection feeding composition** — the advice on the Hardware screen is
   the engine's advice, with the rule that produced it named underneath
+- **writing the files** — `packages.txt`, `install.sh` and `system.toml`, into
+  a directory you name, with the engine's warnings carried into the script as
+  comments
+- **the safety layer** — a dry run that is the same code path as the real
+  write, a refusal to generate anything from a build the engine says is broken,
+  backups of whatever is replaced, and a rollback that will not touch a file
+  you edited afterwards
 
-What does not work yet, and is not pretended to:
+What does not work, and is not pretended to:
 
-- **writing files** — Export shows you what would be generated. It writes
-  nothing and installs nothing.
+- **installing anything.** The generated `install.sh` is a script for a person
+  to read and run on a machine they are provisioning. This tool writes it and
+  stops. It never runs a package manager, never asks for root, and the test
+  suite fails if a line of code anywhere in it contains the word `sudo`.
+- **snapshotting the machine you are running on** — see
+  [Safety Layer](#safety-layer). Advice about the system being designed, not
+  privileged operations on the system you are sitting at.
 - **package-level resolution** — the engine reasons about components, not about
   individual packages and their versions. That is pacman's job, and this tool
   stops where pacman starts.
@@ -631,8 +707,8 @@ What does not work yet, and is not pretended to:
 | 1 | Interface and catalogue | done |
 | 2 | Hardware detection — the Rust detector ported to Python | done |
 | 3 | Compatibility engine — real rule evaluation | done |
-| 4 | Config generation — actually write the files | next |
-| 5 | Safety layer — dry runs, snapshots, rollback | planned |
+| 4 | Config generation — actually write the files | done |
+| 5 | Safety layer — dry runs, backups, rollback | done |
 
 ## On the detector
 
@@ -683,10 +759,34 @@ screens, `t` to switch to a light theme for a projector, and `q` to quit.
 ./run.sh --test          # Windows: .\run.ps1 -Test
 ```
 
-161 tests. Most of them guard data rather than behaviour, because the data is
+222 tests. Most of them guard data rather than behaviour, because the data is
 where this project's value is and where a mistake is hardest to see by
 reading: relationship ids that point at nothing, presets that do not install,
 a rule that can never fire, a GPU pattern that shadows the one below it.
+
+The exceptions are `test_write.py` and `test_safety.py`, which use real
+temporary directories, because the thing they test is exactly the part a fake
+would have to pretend about.
+
+## Generating files, without the interface
+
+The write path is reachable from the command line, which is how to demonstrate
+it in a terminal recording and how the safety layer is easiest to see:
+
+```bash
+./run.sh --dry-run ~/systems/demo     # what would happen, and nothing else
+./run.sh --write   ~/systems/demo     # do it
+./run.sh --rollback ~/systems/demo    # undo it
+./run.sh --write ~/systems/demo --preset developer --scan
+```
+
+`--scan` reads this machine first, so the rules that depend on hardware can be
+decided rather than reported as unknown. `--preset` chooses which build to act
+on; composing a build by hand is what the interface is for.
+
+These go through exactly the same plan, preflight and write path as the buttons
+on the Export screen. A command line that took a shortcut past the safety layer
+would be a hole in it.
 
 ## Hardware, without the interface
 
@@ -701,40 +801,62 @@ shows, and the closest equivalent to what the Rust prototype produced:
 
 ```
 lsc/
-  app.py            the shell: theme, tabs, key bindings, the single Build
-  models.py         Component, Category, Build, Issue — plain dataclasses
-  content.py        every piece of interface copy, in one file
-  conditions.py     the rule language: condition nodes, three-valued logic
-  facts.py          a Build plus a hardware reading, as one namespace of facts
-  engine.py         the evaluator: graph closure, rule evaluation, templating
-  checks.py         the façade the screens call
-  export.py         a build rendered as packages.txt / install.sh / system.toml
-  detect/           hardware detection, ported from the Rust prototype
-    linux.py          /proc, /sys, and the PCI bus
-    macos.py          sysctl, system_profiler, kextstat
-    windows.py        one CIM query, parsed from JSON
+  app.py              the shell: theme, tabs, key bindings, the single Build
+  __main__.py         the command line: --report, --dry-run, --write, --rollback
+  models.py           Component, Category, Build, Issue — plain dataclasses
+  content.py          every piece of interface copy, in one file
+  compat/             the compatibility engine (milestone 3)
+    conditions.py       the rule language: condition nodes, three-valued logic
+    facts.py            a Build plus a hardware reading, as one fact namespace
+    engine.py           the evaluator: graph closure, evaluation, templating
+    checks.py           the façade the screens call
+  generate/           turning a build into files (milestone 4)
+    render.py           a build -> packages.txt / install.sh / system.toml
+    plan.py             a build + a directory -> what writing would do
+    writer.py           carrying out a plan; the only file creator in here
+  safety/             the safety layer (milestone 5)
+    paths.py            where output may and may not go
+    preflight.py        what has to be true before anything is written
+    journal.py          the record of exactly what was written
+    rollback.py         undoing a write, without destroying later edits
+    snapshots.py        whether the system being designed can roll back
+  detect/             hardware detection, ported from the Rust prototype
+    linux.py            /proc, /sys, and the PCI bus
+    macos.py            sysctl, system_profiler, kextstat
+    windows.py          one CIM query, parsed from JSON
   data/
-    catalog.py      the 40 components and their relationships
-    rules.py        the compatibility rules, as data
-    gpus.py         GPU model strings -> architecture and capability
-    presets.py      Gaming, Developer, Minimal, Security Hardened
-    hardware.py     the sample profile, and the seam detection plugs into
-  screens/          one module per screen
-  widgets/          the stack diagram and small shared pieces
-  styles/app.tcss   all colours, as theme variables
+    catalog.py          the 40 components and their relationships
+    rules.py            the compatibility rules, as data
+    gpus.py             GPU model strings -> architecture and capability
+    presets.py          Gaming, Developer, Minimal, Security Hardened
+    hardware.py         the sample profile, and the seam detection plugs into
+  screens/            one module per screen
+  widgets/            the stack diagram and small shared pieces
+  styles/app.tcss     all colours, as theme variables
 docs/
-  rules.md          how to write a compatibility rule
+  rules.md            how to write a compatibility rule
 tests/
-  fixtures.py       fixture machines and builds, shared by the rule tests
+  fixtures.py         fixture machines and builds, shared by the rule tests
+  test_architecture.py  the boundaries, enforced instead of remembered
 legacy/
   rust-hardware-detect/   the original Rust prototype, kept for reference
 run.sh / run.ps1 / run.cmd   launchers that also do first-run setup
 ```
 
-Nothing under `models.py`, `conditions.py`, `facts.py`, `engine.py`,
-`checks.py`, `export.py`, `data/` or `detect/` imports anything from the
-interface. The entire compatibility engine was added in milestone 3 without a
-single screen changing its imports, which is what that separation was for.
+Nothing under `models.py`, `content.py`, `compat/`, `generate/`, `safety/`,
+`data/` or `detect/` imports anything from the interface, and
+`tests/test_architecture.py` fails if that ever stops being true. The entire
+compatibility engine was added in milestone 3 without a single screen changing
+its imports, which is what the separation was for.
+
+That test file is also where the project's central promise lives. Until
+milestone 4 it said *nothing writes*, which was easy to check and easy to keep.
+Now that producing files is the whole point, the rule had to get narrower
+rather than weaker: three named modules may touch a disk, every other module in
+the package may not, each of the three must import the guard that confines it,
+and the allowlist may not grow past three without someone editing the assertion
+that says so. A safety story that only holds until the tool does something is
+not a safety story.
 
 ---
 

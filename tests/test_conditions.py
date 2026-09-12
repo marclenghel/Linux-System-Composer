@@ -8,7 +8,7 @@ false inside an AND still settles the whole thing even when its neighbours are
 unknown — and the entire "we could not check this" feature rests on getting it
 right, so the truth tables are written out rather than reasoned about.
 
-The second is that the rules are data. lsc/conditions.py claims a condition
+The second is that the rules are data. lsc/compat/conditions.py claims a condition
 survives the round trip to JSON and back, which is what makes moving the rules
 into TOML a loader rather than a rewrite. A claim like that is worth nothing
 unless something checks it, so every node type the language knows is round
@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from lsc.conditions import (
+from lsc.compat.conditions import (
     FALSE,
     TRUE,
     UNKNOWN,
@@ -39,7 +39,7 @@ from lsc.conditions import (
     node_kinds,
     parse_version,
 )
-from lsc.facts import World
+from lsc.compat.facts import World
 from lsc.models import Build
 
 

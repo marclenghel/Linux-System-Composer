@@ -10,7 +10,7 @@ requires edges and keeping the path it walked, so the issue can explain the
 route rather than just announcing the destination.
 
 **It evaluates conditions, not fields.** "IF hyprland AND nvidia THEN..." is a
-rule, and rules live in lsc/data/rules.py as data. See lsc/conditions.py for
+rule, and rules live in lsc/data/rules.py as data. See lsc/compat/conditions.py for
 why they are data and not functions.
 
 **It reasons about versions and about hardware.** A component can state what it
@@ -31,9 +31,9 @@ import string
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from lsc.conditions import TRUE, UNKNOWN, Condition
+from lsc.compat.conditions import TRUE, UNKNOWN, Condition
 from lsc.data.catalog import CATEGORIES, COMPONENTS_BY_ID, component_name
-from lsc.facts import World, build_world
+from lsc.compat.facts import World, build_world
 from lsc.models import Build, Issue, Suggestion
 
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}

@@ -1,8 +1,11 @@
 # Launch Linux System Composer on Windows.
 #
-#   .\run.ps1            start the app
-#   .\run.ps1 -Test      run the test suite instead
-#   .\run.ps1 -Report    print the detected hardware as JSON instead
+#   .\run.ps1                    start the app
+#   .\run.ps1 -Test              run the test suite instead
+#   .\run.ps1 -Report            print the detected hardware as JSON instead
+#   .\run.ps1 --dry-run DIR      say what writing a build there would do
+#   .\run.ps1 --write DIR        write it
+#   .\run.ps1 --rollback DIR     undo the last write in that directory
 #
 # Works from any directory - it moves to its own folder first, which is the
 # thing that bites you when you run the app from C:\Windows\system32.
@@ -10,7 +13,12 @@
 
 param(
     [switch]$Test,
-    [switch]$Report
+    [switch]$Report,
+    # Anything else goes straight to `python -m lsc`, so --dry-run, --write,
+    # --rollback and --preset work from the launcher without this file having
+    # to grow a switch for each one.
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Arguments
 )
 
 $ErrorActionPreference = "Stop"
@@ -74,6 +82,8 @@ if ($Test) {
     & $venvPython -m unittest discover -s tests -v
 } elseif ($Report) {
     & $venvPython -m lsc --report
+} elseif ($Arguments) {
+    & $venvPython -m lsc @Arguments
 } else {
     & $venvPython -m lsc
 }

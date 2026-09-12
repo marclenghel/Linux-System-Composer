@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 if TYPE_CHECKING:  # pragma: no cover - only needed for type checking
-    from lsc.facts import World
+    from lsc.compat.facts import World
 
 Truth = Optional[bool]
 

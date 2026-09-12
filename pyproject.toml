@@ -1,6 +1,6 @@
 [project]
 name = "linux-system-composer"
-version = "0.3.0"
+version = "0.5.0"
 description = "Design a Linux system as a graph of components, not a pile of shell commands."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,7 +17,16 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["lsc", "lsc.data", "lsc.detect", "lsc.screens", "lsc.widgets"]
+packages = [
+    "lsc",
+    "lsc.compat",
+    "lsc.data",
+    "lsc.detect",
+    "lsc.generate",
+    "lsc.safety",
+    "lsc.screens",
+    "lsc.widgets",
+]
 
 # The stylesheet is not a .py file, so it has to be listed or it will be missing
 # from an installed copy and the app will fail to start.

@@ -18,9 +18,9 @@ from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
-from lsc import checks, content
+from lsc import compat, content
 from lsc.data.catalog import component_name
-from lsc.engine import Report
+from lsc.compat.engine import Report
 from lsc.models import Build, Issue
 from lsc.widgets.panel import panel
 
@@ -52,7 +52,7 @@ class ValidateScreen(VerticalScroll):
 
     def refresh_view(self) -> None:
         """Re-run the engine and redraw. Called whenever the build changes."""
-        report = checks.evaluate(self.build, self.hardware_profile)
+        report = compat.evaluate(self.build, self.hardware_profile)
 
         self.query_one("#verdict", Static).update(_verdict(report))
 
@@ -110,7 +110,7 @@ def _issue_panel(issue: Issue) -> Static:
     lines = [issue.detail, "", f"[$text-muted]Fix[/]  {issue.fix}"]
     if issue.suggestion is not None:
         lines.append(
-            f"[$text-muted]Apply[/]  set [b]{checks.category_name(issue.suggestion.category_id)}[/b] "
+            f"[$text-muted]Apply[/]  set [b]{compat.category_name(issue.suggestion.category_id)}[/b] "
             f"to [b]{component_name(issue.suggestion.component_id)}[/b]"
         )
     if issue.reference:

@@ -57,13 +57,25 @@ STATUS_DONE = (
     "transitive resolution through the dependency graph, and rules that reason "
     "about the card actually in this machine — every one of them written as "
     "data rather than as code.",
-    "Detection feeding composition: the Hardware screen's advice now comes from "
+    "Detection feeding composition: the Hardware screen's advice comes from "
     "the same rules as Validate, and says under what condition it applies.",
+    "Writing the files. Export puts packages.txt, install.sh and system.toml "
+    "into a directory you name, with the engine's warnings carried into the "
+    "script as comments so they survive to the moment somebody runs it.",
+    "The safety layer. A dry run that is the same code path as the real write, "
+    "a refusal to generate anything from a build the engine says is broken, a "
+    "backup of whatever is replaced, and a rollback that leaves alone any file "
+    "you edited afterwards.",
 )
 
 STATUS_NOT_DONE = (
-    "Writing anything to disk. Export shows you the files; it does not save "
-    "them, and it certainly does not install anything.",
+    "Installing anything. The generated install.sh is a script for you to read "
+    "and run on the machine you are provisioning. This tool writes it and "
+    "stops — it never runs a package manager and never asks for root.",
+    "Snapshotting the machine you are running on. That needs root, and a tool "
+    "that promises never to touch your system does not get an exception for "
+    "the feature called safety. What it does instead is tell you whether the "
+    "system you are designing will be able to roll back.",
     "Package-level resolution. The engine reasons about components, not about "
     "individual packages and their versions — that is pacman's job, and this "
     "tool stops where pacman starts.",
@@ -76,8 +88,8 @@ ROADMAP = (
     ("1", "Interface and catalogue", "done", "Screens, navigation, 40 components with their relationships."),
     ("2", "Hardware detection", "done", "Linux via /proc and /sys, macOS via system_profiler, Windows via one CIM query."),
     ("3", "Compatibility engine", "done", "Rules as data: conditions, versions, hardware, transitive resolution."),
-    ("4", "Config generation", "next", "Write package manifests, install scripts, and bootloader entries."),
-    ("5", "Safety layer", "planned", "Dry runs, snapshots, rollback, and a boot fallback that works."),
+    ("4", "Config generation", "done", "packages.txt, install.sh and system.toml, written where you say."),
+    ("5", "Safety layer", "done", "Dry runs, preflight refusal, backups, and a rollback that respects your edits."),
 )
 
 # ── Hardware screen ───────────────────────────────────────────────────────────
@@ -150,8 +162,17 @@ VALIDATE_CLEAN = (
 # ── Export screen ─────────────────────────────────────────────────────────────
 
 EXPORT_BANNER = (
-    "Preview only — nothing is written to disk and nothing is installed. These "
-    "are the files milestone 4 will generate for real."
+    "These files are generated from the build. Dry run shows what writing them "
+    "would do; Write files does it; Roll back undoes it."
+)
+
+EXPORT_READY = (
+    "Ready to write into {target} — nothing is installed and nothing outside "
+    "that directory is touched. Anything replaced is backed up first."
+)
+
+EXPORT_BLOCKED = (
+    "This build cannot be written yet:"
 )
 
 EXPORT_FILES = (
@@ -162,4 +183,4 @@ EXPORT_FILES = (
 
 # ── Footer / misc ─────────────────────────────────────────────────────────────
 
-FOOTER_NOTE = "Milestone 3 — compatibility engine"
+FOOTER_NOTE = "Milestone 5 — safety layer"
