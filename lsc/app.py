@@ -93,6 +93,16 @@ class ComposerApp(App[None]):
 
     # ── keeping the tabs in step ──────────────────────────────────────────────
 
+    def on_hardware_screen_scanned(self, event: HardwareScreen.Scanned) -> None:
+        """Detection finished, so Validate can run the rules that need a machine.
+
+        Routed through the app rather than read directly by Validate, because a
+        screen reaching into a sibling screen is how two tabs end up disagreeing
+        about what the hardware is. The app owns the Build; it may as well own the
+        one other fact both screens care about.
+        """
+        self.query_one(ValidateScreen).set_hardware(event.profile, event.is_real)
+
     def on_compose_screen_build_changed(self, _event: ComposeScreen.BuildChanged) -> None:
         """Compose changed the build, so the screens that read it must catch up.
 

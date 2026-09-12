@@ -16,6 +16,7 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+from lsc.conditions import is_pre_turing_nvidia
 from lsc.detect import SOURCE_DETECTED, SOURCE_SAMPLE, detect
 
 __all__ = [
@@ -87,21 +88,32 @@ def suggestions_for(profile: dict[str, Any]) -> list[tuple[str, str, str]]:
     Returns (category_id, component_id, reason) triples — the seam where
     detection meets composition.
 
-    Still crude on purpose. Matching vendor strings is not a compatibility
-    engine, and now that the readings are real it matters more, not less, that
-    this is not mistaken for one. Milestone 3 replaces it with rules that can
-    say *why* under what conditions.
+    Short and direct on purpose, and that is not the same thing as crude. This
+    answers "what should I pick?" before anything has been chosen; the engine in
+    lsc/engine.py answers "what is wrong with what I picked?", which needs the
+    build as well as the machine. Two questions, two places.
+
+    What it must not be is *inconsistent* with the engine — a screen that
+    recommends the open NVIDIA modules while Validate reports them as an error on
+    the same machine is worse than either screen alone. So the generation check
+    below is the same one the engine's rule uses.
     """
     suggestions: list[tuple[str, str, str]] = []
     vendors = {gpu.get("vendor", "").upper() for gpu in profile.get("gpus", [])}
+    names = [gpu.get("name", "") for gpu in profile.get("gpus", [])]
 
     if "NVIDIA" in vendors:
+        pre_turing = any(is_pre_turing_nvidia(name) for name in names)
         suggestions.append(
             (
                 "gpu",
-                "nvidia-open",
-                "An NVIDIA GPU was reported, and the open kernel modules are the "
-                "vendor's recommended driver on RTX 20-series and newer.",
+                "nvidia" if pre_turing else "nvidia-open",
+                "An NVIDIA GPU older than the RTX 20 series was reported. The open "
+                "kernel modules do not support it, so the proprietary driver is the "
+                "one that will bind to this card."
+                if pre_turing
+                else "An NVIDIA GPU was reported, and the open kernel modules are "
+                "the vendor's recommended driver on RTX 20-series and newer.",
             )
         )
     elif vendors & {"AMD", "INTEL"}:

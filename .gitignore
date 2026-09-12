@@ -10,6 +10,9 @@ venv/
 
 # Rust (legacy prototype)
 /legacy/rust-hardware-detect/target
+# The prototype used to live at the repo root, and a stale build
+# directory is still there on machines that built it before the move.
+/target
 
 # Generated output
 hardware_report.json

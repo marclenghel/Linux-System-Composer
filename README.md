@@ -37,6 +37,7 @@ A compatibility-aware platform for visually designing, validating, generating, a
 - [Why This Project Exists](#why-this-project-exists)
 - [Status](#status)
    - [Milestones](#milestones)
+   - [On the compatibility engine](#on-the-compatibility-engine)
    - [On the detector](#on-the-detector)
 - [Running it](#running-it)
    - [Tests](#tests)
@@ -340,7 +341,11 @@ Used for:
 
 ## Compatibility Engine
 
-The heart of the platform.
+The heart of the platform, and as of milestone 3 the part that exists rather
+than the part that is planned. It lives in `lsc/engine.py`, the vocabulary its
+rules are written in lives in `lsc/conditions.py`, and the rules themselves are
+data in `lsc/data/rules.py`. [How it works](#on-the-compatibility-engine) is
+below, under Status.
 
 Responsible for:
 
@@ -349,17 +354,31 @@ Responsible for:
 - recommendation generation
 - stack validation
 
-Example:
+The relationships that are simply true are fields on a component, and the engine
+derives issues from them:
 
+```python
+Component(
+    id="hyprland",
+    requires=("wayland",),
+    recommends=("pipewire",),
+    kernel_min="6.6",
+)
 ```
-{
-  "hyprland": {
-    "requires": ["wayland"],
-    "recommended": ["pipewire"],
-    "conflicts": ["nvidia-legacy"],
-    "kernel_min":"6.6"
-  }
-}
+
+The facts with a *condition* attached cannot be written that way — "NVIDIA and
+Wayland" is not a conflict, it is a pairing that needs a kernel parameter nobody
+tells you about — so those are rules:
+
+```python
+Rule(
+    id="nvidia-wayland-modeset",
+    severity="warning",
+    when=AllOf(Has("wayland"), HasAnyOf("nvidia", "nvidia-open")),
+    title="NVIDIA on Wayland needs DRM mode setting turned on",
+    detail="...no Wayland compositor will start without it...",
+    fix="Boot with nvidia_drm.modeset=1...",
+)
 ```
 
 
@@ -511,7 +530,7 @@ without removing the power and flexibility that make Linux valuable.
 
 # Status
 
-**Milestone 2 of 5 — hardware detection.**
+**Milestone 3 of 5 — the compatibility engine.**
 
 What works today:
 
@@ -522,15 +541,18 @@ What works today:
   contents
 - **real hardware detection** on Linux, macOS and Windows, running in a
   background thread so the interface never freezes while it reads
+- **the compatibility engine** — resolution before judgement, conditional rules
+  with explanations and fixes, and hardware-aware rules that stay silent until a
+  machine has actually been read. Described in full below.
 
 What does not work yet, and is not pretended to:
 
-- **the compatibility engine** — Validate runs a forty-line walk over the
-  `requires` / `conflicts` fields. It is enough to prove the screen works and
-  nothing like the engine described above.
-- **detection feeding composition properly** — the suggestions on the Hardware
-  screen match vendor strings. They do not reason about what the hardware can
-  actually run.
+- **package-level dependency solving** — the graph is components, not packages.
+  The engine knows Hyprland needs Wayland; it does not know that your mirror is
+  missing a library version.
+- **kernel versions that keep themselves current** — the numbers the engine
+  compares against are written by hand in the catalogue and go stale until
+  somebody refreshes them.
 - **writing files** — Export shows you what would be generated. It writes
   nothing and installs nothing.
 
@@ -540,9 +562,88 @@ What does not work yet, and is not pretended to:
 |---|-----------|-------|
 | 1 | Interface and catalogue | done |
 | 2 | Hardware detection — the Rust detector ported to Python | done |
-| 3 | Compatibility engine — real rule evaluation | next |
-| 4 | Config generation — actually write the files | planned |
+| 3 | Compatibility engine — real rule evaluation | done |
+| 4 | Config generation — actually write the files | next |
 | 5 | Safety layer — dry runs, snapshots, rollback | planned |
+
+## On the compatibility engine
+
+The placeholder it replaced was a forty-line walk over three tuple fields. Five
+things make the difference between that and an engine.
+
+**It resolves before it judges.** Selecting the Hardened security profile pulls
+in the hardened kernel, because the profile declares it as a requirement. The
+hardened kernel refuses the proprietary NVIDIA driver. The old check never saw
+that conflict, because `linux-hardened` was not in the list of things the user
+had literally selected. The engine first computes the *effective set* — every
+selection plus everything those selections drag in behind them, transitively —
+and only then looks for problems:
+
+```
+✕  NVIDIA (proprietary) conflicts with linux-hardened
+
+   NVIDIA (proprietary) is selected. linux-hardened is not selected
+   directly — it is required by Hardened. They cannot be installed
+   together.
+
+   Fix  Change one of the two decisions behind this:
+        NVIDIA (proprietary) or Hardened.
+```
+
+The chain is the point. An error about a component the user never chose is
+useless without it, and the suggested fix names a decision they can actually
+revisit rather than the implied component they have no control over.
+
+**It can tell a gap from a contradiction.** "Hyprland requires Wayland and you
+have not chosen a display server" is a gap — the answer is to choose one, and the
+build will imply it anyway. "Hyprland requires Wayland and you chose Xorg" is a
+contradiction: two decisions that cannot both stand, and which one to abandon is
+the user's call, not the tool's. The placeholder printed the same sentence for
+both.
+
+**It reasons about versions.** Components may declare the oldest kernel they will
+run on, and kernel components carry the version of their series, so a floor can
+be compared against something real. This one is honestly quiet: with the current
+catalogue every floor is met, so it says nothing. It is covered directly by tests
+rather than left to rot, and it earns its place the first time a component needs
+something newer than the LTS series.
+
+**It knows about the machine, when there is one.** Rules may ask what GPU is in
+this computer, how much memory it has, or which modules are loaded right now — so
+"the open NVIDIA modules do not support this machine's GPU" is an error on a GTX
+1060 and silence on an RTX 4070.
+
+The trap underneath that feature is worth spelling out, because getting it wrong
+would make the tool actively misleading. One rule reads *"an NVIDIA driver is
+selected, but no NVIDIA GPU was detected"*. Phrased as a negative, evaluated
+against a machine nobody has read, it is true of every computer in the world. So
+conditions do not silently degrade to false: each one declares whether it reads
+hardware, the condition tree propagates that upward, and the engine skips any
+rule that needs a reading it does not have. The Validate screen then says how
+much of the rule set actually ran:
+
+```
+⚠  Build-only check. The rules that ask about the GPU, the memory, or the
+   loaded modules are skipped until a scan has run — open Hardware to take one.
+   11 of 19 rules ran; 8 need a hardware reading.
+```
+
+A tool that gives advice should be able to state how much it looked at. "No
+problems found" means something different when a third of the rules were skipped.
+
+**The knowledge is separable from the evaluation.** `lsc/engine.py` contains no
+Linux knowledge at all — every sentence a user reads comes from the catalogue or
+from a rule. Rules are data, written in a fixed vocabulary of conditions rather
+than as Python functions, which is what lets them be counted, printed, tested
+for reachability, and eventually loaded from a file instead of a module.
+
+The tests are the part to read if you want to know what the engine really
+promises: `tests/test_engine.py` covers resolution, transitive conflicts, the
+gap/contradiction distinction, version floors, every hardware rule, and — the one
+that matters most — that no hardware rule can fire without a hardware reading.
+One test sweeps pairs of choices across the whole catalogue to prove every rule
+is reachable, which is the only way a typo in a component id inside a rule ever
+becomes visible.
 
 ## On the detector
 
@@ -609,7 +710,8 @@ lsc/
   app.py            the shell: theme, tabs, key bindings, the single Build
   models.py         Component, Category, Build, Issue — plain dataclasses
   content.py        every piece of interface copy, in one file
-  checks.py         the placeholder compatibility check (milestone 3 replaces it)
+  engine.py         the compatibility engine: resolve, then judge
+  conditions.py     the vocabulary a rule may speak, and the Context it reads
   export.py         a build rendered as packages.txt / install.sh / system.toml
   detect/           hardware detection, ported from the Rust prototype
     linux.py          /proc, /sys, and the PCI bus
@@ -617,6 +719,7 @@ lsc/
     windows.py        one CIM query, parsed from JSON
   data/
     catalog.py      the 40 components and their relationships
+    rules.py        the curated rules — knowledge that needs a condition
     presets.py      Gaming, Developer, Minimal, Security Hardened
     hardware.py     the sample profile, and the seam detection plugs into
   screens/          one module per screen

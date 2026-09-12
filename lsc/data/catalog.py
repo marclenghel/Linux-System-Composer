@@ -128,6 +128,12 @@ KERNEL = Category(
         "better for new hardware and worse for modules built outside the kernel tree."
     ),
     default="linux",
+    # The `version` on each kernel below is the series this catalogue was written
+    # against, and it is the only number the compatibility engine has to compare
+    # a component's `kernel_min` with. It is hand-maintained data that goes
+    # stale, which is exactly why it is data: correcting it is a one-line edit
+    # here rather than a change to a rule. Only the ordering matters in practice
+    # — mainline ahead of LTS — so being a point release behind costs nothing.
     components=(
         Component(
             id="linux",
@@ -138,6 +144,7 @@ KERNEL = Category(
                 "support arrives quickly, and every wiki page assumes you are running it."
             ),
             tags=("mainline", "default"),
+            version="6.16",
             packages=("linux", "linux-headers"),
         ),
         Component(
@@ -151,6 +158,7 @@ KERNEL = Category(
                 "support for hardware released after the branch was cut."
             ),
             tags=("lts", "conservative"),
+            version="6.12",
             packages=("linux-lts", "linux-lts-headers"),
         ),
         Component(
@@ -163,6 +171,7 @@ KERNEL = Category(
                 "vanilla: still mainline, still current, just tuned for a desktop."
             ),
             tags=("desktop", "low-latency"),
+            version="6.16",
             packages=("linux-zen", "linux-zen-headers"),
         ),
         Component(
@@ -177,6 +186,7 @@ KERNEL = Category(
             ),
             tags=("performance", "gaming", "scheduler"),
             requires=("cachyos",),
+            version="6.16",
             packages=("linux-cachyos", "linux-cachyos-headers"),
             maturity="modern",
         ),
@@ -192,6 +202,7 @@ KERNEL = Category(
             ),
             tags=("security", "hardened"),
             conflicts=("nvidia",),
+            version="6.16",
             packages=("linux-hardened", "linux-hardened-headers"),
         ),
     ),
@@ -520,6 +531,7 @@ DESKTOP = Category(
             tags=("wayland", "tiling", "customisable"),
             requires=("wayland",),
             recommends=("pipewire",),
+            kernel_min="6.6",
             packages=("hyprland", "waybar", "wofi", "xdg-desktop-portal-hyprland"),
             maturity="modern",
         ),
@@ -574,6 +586,7 @@ DESKTOP = Category(
             ),
             tags=("wayland", "scrollable-tiling", "novel"),
             requires=("wayland",),
+            kernel_min="6.6",
             packages=("niri", "waybar", "fuzzel"),
             maturity="experimental",
         ),

@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import unittest
 
-from lsc import checks, export
+from lsc import engine, export
+from lsc.conditions import parse_version
 from lsc.data.catalog import (
     CATEGORIES,
+    CATEGORIES_BY_ID,
     CATEGORY_BY_LAYER,
     COMPONENTS_BY_ID,
     LAYERS,
@@ -63,7 +65,7 @@ class TestCatalogueIntegrity(unittest.TestCase):
                     f"{category.id} defaults to unknown '{category.default}'",
                 )
 
-        issues = checks.check(Build(selections=default_selections()))
+        issues = engine.check(Build(selections=default_selections()))
         errors = [issue for issue in issues if issue.severity == "error"]
         self.assertEqual(errors, [], "the default build must be installable")
 
@@ -102,7 +104,7 @@ class TestPresets(unittest.TestCase):
     def test_presets_install(self) -> None:
         """A preset that ships with an error in it is a bug in the preset."""
         for preset in PRESETS:
-            issues = checks.check(Build(name=preset.id, selections=dict(preset.selections)))
+            issues = engine.check(Build(name=preset.id, selections=dict(preset.selections)))
             errors = [issue.title for issue in issues if issue.severity == "error"]
             self.assertEqual(errors, [], f"preset '{preset.id}' has errors: {errors}")
 
@@ -121,25 +123,50 @@ class TestExport(unittest.TestCase):
         self.assertIn("nvidia_drm.modeset=1", export.install_script(build))
 
 
-class TestChecks(unittest.TestCase):
+class TestCatalogueAgainstTheEngine(unittest.TestCase):
+    """The catalogue has to survive the engine, not just be well-formed.
+
+    The engine's own behaviour is tested in test_engine.py. These two are about
+    the data: a component whose relationships are wrong shows up here as a
+    default build or a preset that cannot install.
+    """
+
     def test_conflict_is_reported_once_not_twice(self) -> None:
         """SELinux and Arch each declare the clash; the user should see one issue."""
         build = Build(selections={**default_selections(), "security": "selinux"})
-        conflicts = [i for i in checks.check(build) if "conflicts with" in i.title]
+        conflicts = [i for i in engine.check(build) if i.rule_id == "conflict"]
         self.assertEqual(len(conflicts), 1, [i.title for i in conflicts])
 
-    def test_missing_requirement_is_an_error(self) -> None:
-        # linux-cachyos needs the CachyOS repositories; the default base is Arch.
+    def test_contradicted_requirement_is_an_error(self) -> None:
+        # linux-cachyos needs the CachyOS repositories; the default base is Arch,
+        # so this is a contradiction rather than a gap.
         build = Build(selections={**default_selections(), "kernel": "linux-cachyos"})
-        self.assertFalse(checks.build_is_installable(checks.check(build)))
+        self.assertFalse(engine.build_is_installable(engine.check(build)))
 
     def test_optional_category_may_be_empty(self) -> None:
         """A headless build has no display server, and that is not a problem."""
         selections = default_selections()
         selections.pop("display")
         selections["desktop"] = "headless"
-        warnings = [i for i in checks.check(Build(selections=selections)) if i.severity == "warning"]
+        warnings = [i for i in engine.check(Build(selections=selections)) if i.severity == "warning"]
         self.assertEqual(warnings, [])
+
+    def test_every_kernel_declares_a_version(self) -> None:
+        """The engine cannot compare a kernel_min against a kernel with no version."""
+        kernel = CATEGORIES_BY_ID["kernel"]
+        for component in kernel.components:
+            self.assertTrue(
+                component.version,
+                f"{component.id} has no version, so kernel_min checks go quiet",
+            )
+
+    def test_kernel_minimums_are_readable(self) -> None:
+        for component in COMPONENTS_BY_ID.values():
+            if component.kernel_min:
+                self.assertTrue(
+                    parse_version(component.kernel_min),
+                    f"{component.id}.kernel_min is not a version",
+                )
 
 
 if __name__ == "__main__":

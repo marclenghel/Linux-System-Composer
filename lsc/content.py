@@ -53,15 +53,18 @@ STATUS_DONE = (
     "Preset builds, and the export preview that turns a build into file contents.",
     "Real hardware detection on Linux, macOS and Windows — the Rust prototype "
     "ported to Python, running in a background thread so nothing freezes.",
+    "The compatibility engine. It resolves what your choices pull in before it "
+    "judges them, so it catches conflicts through components you never selected; "
+    "it separates a gap from a contradiction; and it runs a curated rule set "
+    "whose hardware-aware rules only fire once a machine has been read.",
 )
 
 STATUS_NOT_DONE = (
-    "The compatibility engine. Validate runs a deliberately simple check over "
-    "the requires/conflicts fields — enough to prove the screen works, nowhere "
-    "near the rule engine described in the README.",
-    "Detection feeding composition properly. The suggestions on the Hardware "
-    "screen match vendor strings; they do not reason about what the hardware "
-    "can actually run.",
+    "Package-level dependency solving. The graph is components, not packages — "
+    "the engine knows Hyprland needs Wayland, not that a particular library "
+    "version is missing from your mirror.",
+    "The kernel versions the engine compares against are written down by hand in "
+    "the catalogue, so they go stale until somebody refreshes them.",
     "Writing anything to disk. Export shows you the files; it does not save "
     "them, and it certainly does not install anything.",
 )
@@ -69,8 +72,8 @@ STATUS_NOT_DONE = (
 ROADMAP = (
     ("1", "Interface and catalogue", "done", "Screens, navigation, 40 components with their relationships."),
     ("2", "Hardware detection", "done", "Linux via /proc and /sys, macOS via system_profiler, Windows via one CIM query."),
-    ("3", "Compatibility engine", "next", "Real rule evaluation: resolution, explanation, suggested fixes."),
-    ("4", "Config generation", "planned", "Write package manifests, install scripts, and bootloader entries."),
+    ("3", "Compatibility engine", "done", "Resolution before judgement, conditional rules, explanations with fixes."),
+    ("4", "Config generation", "next", "Write package manifests, install scripts, and bootloader entries."),
     ("5", "Safety layer", "planned", "Dry runs, snapshots, rollback, and a boot fallback that works."),
 )
 
@@ -103,15 +106,27 @@ PRESETS_TITLE = "Start from a preset"
 
 # ── Validate screen ───────────────────────────────────────────────────────────
 
-VALIDATE_PLACEHOLDER_BANNER = (
-    "Placeholder check. This reads the requires/conflicts fields in the "
-    "catalogue and nothing more — no version constraints, no transitive "
-    "resolution, no hardware awareness. Milestone 3 replaces it."
+# The screen used to carry a banner admitting the check behind it was a
+# placeholder. Milestone 3 made the engine real, so the admission is gone — but
+# the honesty it existed for is not: the coverage lines below say how much of the
+# rule set actually ran, because "no problems found" means less when a third of
+# the rules were skipped for want of a hardware reading.
+VALIDATE_COVERAGE_FULL = (
+    "Full check: the build, its implied components, and the rules that need to "
+    "know what this machine is."
 )
 
+VALIDATE_COVERAGE_PARTIAL = (
+    "Build-only check. The rules that ask about the GPU, the memory, or the "
+    "loaded modules are skipped until a scan has run — open Hardware to take one."
+)
+
+VALIDATE_IMPLIED = "Pulled in by your choices:"
+
 VALIDATE_CLEAN = (
-    "Nothing to report. Every requirement in this build is satisfied and no two "
-    "components declare a conflict with each other."
+    "Nothing to report. Every requirement in this build is satisfied, nothing it "
+    "pulls in conflicts with anything else, and no rule in the set had anything "
+    "to say about this combination."
 )
 
 # ── Export screen ─────────────────────────────────────────────────────────────
@@ -129,4 +144,4 @@ EXPORT_FILES = (
 
 # ── Footer / misc ─────────────────────────────────────────────────────────────
 
-FOOTER_NOTE = "Milestone 2 — hardware detection"
+FOOTER_NOTE = "Milestone 3 — compatibility engine"

@@ -38,6 +38,18 @@ class Component:
     packages: tuple[str, ...] = ()                # what a generated install would pull
     maturity: str = "stable"                      # stable | modern | legacy | experimental
 
+    # ── version constraints, read by the compatibility engine ────────────────
+    #
+    # `version` is only meaningful on kernel components: the series version this
+    # catalogue was written against, so the engine has a number to compare with.
+    # It is data that goes stale and is expected to be refreshed, which is
+    # exactly why it lives here as data rather than being hard-coded in a rule.
+    #
+    # `kernel_min` is the oldest kernel this component is willing to run on —
+    # the `kernel_min` of the README's example rule, made real.
+    version: str | None = None
+    kernel_min: str | None = None
+
 
 @dataclass(frozen=True)
 class Category:
@@ -124,6 +136,13 @@ class Issue:
     title: str
     detail: str
     fix: str
+
+    # Which rule produced this, and which components it is about. Neither is
+    # needed to render an issue, but without them an issue cannot be traced back
+    # to the knowledge that raised it — and "why does it say that?" is the first
+    # question anyone asks of a tool that gives advice.
+    rule_id: str = ""
+    components: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ from typing import Any
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.message import Message
 from textual.widgets import Button, DataTable, Static
 
 from lsc import content
@@ -28,6 +29,20 @@ from lsc.widgets.panel import panel
 
 class HardwareScreen(VerticalScroll):
     """Live view of the machine, with the sample profile as a placeholder."""
+
+    class Scanned(Message):
+        """A profile was applied to this screen.
+
+        Posted for the fixture as well as for a real reading, with `is_real`
+        saying which — the compatibility engine has rules that must not run on a
+        sample, so the distinction has to travel with the data rather than be
+        re-derived by whoever receives it.
+        """
+
+        def __init__(self, profile: dict[str, Any], is_real: bool) -> None:
+            super().__init__()
+            self.profile = profile
+            self.is_real = is_real
 
     def __init__(self) -> None:
         super().__init__()
@@ -100,6 +115,10 @@ class HardwareScreen(VerticalScroll):
     def _apply(self, profile: dict[str, Any]) -> None:
         """Put a profile on screen. Called for the fixture and for real scans."""
         self.profile = profile
+
+        self.post_message(
+            self.Scanned(profile, profile.get("source") == hardware.SOURCE_DETECTED)
+        )
 
         self._apply_banner(profile)
         self._panel("System").update(_system_body(profile))
@@ -201,9 +220,12 @@ def _drivers_body(profile: dict[str, Any]) -> str:
 def _suggestions_body(profile: dict[str, Any]) -> str:
     """Show the detection-to-composition seam.
 
-    Produced by a crude vendor-string match, not by a compatibility engine.
-    The closing line says so rather than letting neat formatting imply more
-    intelligence than there is.
+    Deliberately still a short, direct reading of the profile: this answers
+    "what should I pick?" before anything has been chosen, which is a different
+    question from the engine's "what is wrong with what I picked?". Keeping it
+    simple is fine; keeping it *inconsistent with the engine* is not, which is
+    why the NVIDIA suggestion checks the card's generation rather than the
+    vendor string alone.
     """
     suggestions = hardware.suggestions_for(profile)
     if not suggestions:
@@ -222,7 +244,9 @@ def _suggestions_body(profile: dict[str, Any]) -> str:
 
     lines.append("")
     lines.append(
-        "[$text-muted italic]Matched on vendor strings alone. Milestone 3 replaces "
-        "this with real rules.[/]"
+        "[$text-muted italic]These are starting points, matched on what was "
+        "detected. The reasoning about a build lives in Validate, where the "
+        "engine's hardware rules run against whatever you have actually "
+        "chosen.[/]"
     )
     return "\n".join(lines)
